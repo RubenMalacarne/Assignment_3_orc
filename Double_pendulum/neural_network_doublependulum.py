@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tqdm
 from sklearn.model_selection import train_test_split
-
+from sklearn.preprocessing import MinMaxScaler
 from casadi import MX, Function
 import l4casadi as l4c
 
@@ -51,8 +51,10 @@ class NeuralNetwork(nn.Module):
         
         df = pd.read_csv(file_name)
         X = df[["q1", "v1","q2", "v2"]].values
-        y = df["cost"].values
-        y = y / config.SCALE
+        #rescale_between [-1 and 1]
+        y = df["cost"].values.reshape(-1, 1)
+        scaler = MinMaxScaler(feature_range=(-1, 1))
+        y = scaler.fit_transform(y).flatten()
         X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, shuffle=True)
         print(np.shape(X), np.shape(y))
         print(np.shape(X_train), np.shape(y_train))
