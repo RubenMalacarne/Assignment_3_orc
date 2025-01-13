@@ -46,7 +46,7 @@ DISPLAY_T = 0.02              # update robot configuration in viwewer every DISP
 TAU_MAX = 1
 TAU_MIN = -1
     # how to save csv file
-booltrain_file = True # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_eval
+booltrain_file = False # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_eval
 # ----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
 # OCP configuration

@@ -40,20 +40,26 @@ class DoublePendulumOCP:
         self.q1_list,self.v1_list,self.q2_list,self.v2_list = self.set_initial_state_list()
 
         # Load the trained neural network
-        self.neural_network = NeuralNetwork(file_name="ocp_dataset_DP_train.csv")
-        self.neural_network.model.load_state_dict(torch.load("model.pt"))
-        self.neural_network.model.eval()
-
-        self.neural_network.create_casadi_function(robot_name="double_pendulum", input_size=4, load_weights=False)
-
+        self.neural_network = NeuralNetwork(file_name="models/ocp_dataset_DP_train.csv",input_size=self.nx)
         
+        # self.neural_network.line_stack.load_state_dict(torch.load("models/model.pt"))
+        # self.neural_network.line_stack.eval()
+        dataset = pd.read_csv('models/ocp_dataset_DP_train.csv')
+        self.out_min = min(dataset['cost'])
+        self.out_max = max(dataset['cost'])
+
+        f_teminal_cost = self.neural_network.create_casadi_function("double_pendulum",'models/', self.nx, load_weights=True)
+    
         self.opti = cs.Opti()
         self.inv_dyn,self.dynamic_f = self.set_dynamics()
         
         self.param_x_init = self.opti.parameter(self.nx)
         self.param_q_des  = self.opti.parameter(self.nq)
     
-    
+    def NN_cost_pred(self, init_cond):
+        # return the rescaled output of the N.N.
+        NN_out = self.neural_network.nn_func(init_cond)
+        return (NN_out+1.)/2. * (self.out_max - self.out_min) + self.out_min
     def set_initial_state_list(self):
         # qs1_0,dqs1_0,qs2_0,dqs2_0 =initial_state ()
         n_qs = self.number_init_state
@@ -126,10 +132,10 @@ class DoublePendulumOCP:
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
         
         # # Add terminal cost using the neural network
-
-        terminal_cost_expr = self.terminal_cost(X[:, -1])
-        running_cost += terminal_cost_expr
-        
+        # breakpoint()
+        terminal_cost_expr = self.NN_cost_pred(X[-1][:self.nx])
+        running_cost += self.w_final * terminal_cost_expr.T @ terminal_cost_expr
+        breakpoint()
 
         self.opti.subject_to(X[0] == self.param_x_init)
         

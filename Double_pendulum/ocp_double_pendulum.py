@@ -2,7 +2,7 @@ from example_robot_data.robots_loader import load
 from adam.casadi.computations import KinDynComputations
 import numpy as np
 import casadi as cs
-
+import os
 from utils.robot_simulator import RobotSimulator
 from utils.robot_loaders import loadUR
 from utils.robot_wrapper import RobotWrapper
@@ -25,7 +25,7 @@ class DoublePendulumOCP:
         self.kinDyn = KinDynComputations(self.robot.urdf, [s for s in self.robot.model.names[1:]])
         self.nq = len(self.robot.model.names[1:])
         
-        self.N  = config.N
+        self.N  = config.N_step
         self.q_des = config.q_des
         self.nx = 2 * self.nq
         self.dt = config.dt
@@ -150,22 +150,21 @@ class DoublePendulumOCP:
         return state_buffer,cost_buffer
     
     def save_result(self, state_buffer, cost_buffer,booltrain_file = True):
-        if (booltrain_file):
-            filename = 'ocp_dataset_DP_train.csv'
-            positions_q1 = [state[0] for state in state_buffer]
-            velocities_v1 = [state[1] for state in state_buffer]
-            positions_q2 = [state[2] for state in state_buffer]
-            velocities_v2 = [state[3] for state in state_buffer]
-            df = pd.DataFrame({'q1': positions_q1, 'v1': velocities_v1, 'q2': positions_q2, 'v2': velocities_v2, 'cost': cost_buffer})
-            df.to_csv(filename, index=False)
+        if booltrain_file:
+            filename = 'models/ocp_dataset_DP_train.csv'
         else:
-            filename = 'ocp_dataset_DP_eval.csv'
-            positions_q1 = [state[0] for state in state_buffer]
-            velocities_v1 = [state[1] for state in state_buffer]
-            positions_q2 = [state[2] for state in state_buffer]
-            velocities_v2 = [state[3] for state in state_buffer]
-            df = pd.DataFrame({'q1': positions_q1, 'v1': velocities_v1, 'q2': positions_q2, 'v2': velocities_v2, 'cost': cost_buffer})
-            df.to_csv(filename, index=False)
+            filename = 'models/ocp_dataset_DP_eval.csv'
+        
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        positions_q1 =  [state[0] for state in state_buffer]
+        positions_q2 =  [state[1] for state in state_buffer]
+        velocities_v1 = [state[2] for state in state_buffer]
+        velocities_v2 = [state[3] for state in state_buffer]
+        df = pd.DataFrame({'q1': positions_q1, 'q2': positions_q2, 'v1': velocities_v1, 'v2': velocities_v2, 'cost': cost_buffer})
+        df.to_csv(filename, index=False)
+        
+        print(f"File saved: {filename}")
         
 if __name__ == "__main__":
     time_start = clock()
