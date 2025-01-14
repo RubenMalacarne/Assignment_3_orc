@@ -24,7 +24,7 @@ w_a = 1e-6      # acceleration weight
 w_final = 1e2   # final cost weight --> not used
 
     # number of the initial states
-number_init_state = 100
+n_init_state_ocp = 100
 
     # parameter for visualization 
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
@@ -49,30 +49,20 @@ TAU_MIN = -1
 booltrain_file = False # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_eval
 # ----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
-# OCP configuration
+# OCP and MCP configuration
 # ----------------------------------------------------------------------------------------------------
 
     # horizon parameters--> N
 T = 0.20         # OCP horizon size
-dt = 0.01        # OCP time step
-N_step = int(T/dt);   # Number of horizon step
+dt = 0.01        # OCP time step+
+steps = int (T/dt)
+N_step =10#steps *5;   # Number of horizon step
+M_step =steps;   # Number of horizon step
+
 N_sim = 50
-
-
-number_init_state = 11
-
-
-
-# ----------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------
-# MCP configuration
-# ----------------------------------------------------------------------------------------------------
-
-    # horizon parameters--> M
-T = 0.20         # OCP horizon size
-dt = 0.1        # OCP time step
-M_step = int(T/dt);   # Number of horizon step
 M_sim = 50
+
+n_init_state_ocp = 11
 
 q0      = np.array([2,2]) 
 

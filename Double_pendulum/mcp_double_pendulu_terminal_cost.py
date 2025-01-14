@@ -132,10 +132,9 @@ class DoublePendulumOCP:
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
         
         # # Add terminal cost using the neural network
-        # breakpoint()
         terminal_cost_expr = self.NN_cost_pred(X[-1][:self.nx])
         running_cost += self.w_final * terminal_cost_expr.T @ terminal_cost_expr
-        breakpoint()
+
 
         self.opti.subject_to(X[0] == self.param_x_init)
         

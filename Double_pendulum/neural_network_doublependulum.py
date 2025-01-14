@@ -120,7 +120,7 @@ class NeuralNetwork(nn.Module):
     def read_file_csv(self,file_name):
         
         df = pd.read_csv(file_name)
-        X = df[["q1", "v1","q2", "v2"]].values
+        X = df[["q1","q2","v1","v2"]].values
         #rescale_between [-1 and 1]
         y = df["cost"].values.reshape(-1, 1)
         scaler = MinMaxScaler(feature_range=(-1, 1))

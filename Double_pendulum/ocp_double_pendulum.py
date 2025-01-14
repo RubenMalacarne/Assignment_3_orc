@@ -19,29 +19,29 @@ from termcolor import colored
 
 class DoublePendulumOCP:
     
-    def __init__(self, robot_model="double_pendulum",number_init_state_ = config.number_init_state):
+    def __init__(self, robot_model="double_pendulum"):
         
-        self.robot = load(robot_model)
+        self.robot  = load(robot_model)
         self.kinDyn = KinDynComputations(self.robot.urdf, [s for s in self.robot.model.names[1:]])
-        self.nq = len(self.robot.model.names[1:])
+        self.nq     = len(self.robot.model.names[1:])
         
+        self.number_init_state = config.n_init_state_ocp
+        self.q1_list,self.v1_list,self.q2_list,self.v2_list = self.set_initial_state_list()
         self.N  = config.N_step
+        
         self.q_des = config.q_des
         self.nx = 2 * self.nq
         self.dt = config.dt
-        
         
         self.w_p = config.w_p
         self.w_v = config.w_v
         self.w_a = config.w_a
         self.w_final = config.w_final
-        self.number_init_state = number_init_state_
-        self.q1_list,self.v1_list,self.q2_list,self.v2_list = self.set_initial_state_list()
         
         self.opti = cs.Opti()
         self.inv_dyn,self.dynamic_f = self.set_dynamics()
         
-        print("Initialized DoublePendulumOCP")
+        print("Initializeation Double_Pendulum OCP complete!")
     
     def set_initial_state_list(self):
         # qs1_0,dqs1_0,qs2_0,dqs2_0 =initial_state ()
@@ -82,8 +82,7 @@ class DoublePendulumOCP:
         inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
         return inv_dyn,dynamic_f
 
-    
-    def setup_optimization(self, q0, dq0, q_des):
+    def setup_ocp(self, q0, dq0, q_des):
         
         param_x_init = self.opti.parameter(self.nx)
         param_q_des  = self.opti.parameter(self.nq)
@@ -99,11 +98,11 @@ class DoublePendulumOCP:
             X.append(self.opti.variable(self.nx))
         for i in range(self.N):
             U.append(self.opti.variable(self.nq))
-   
+        
         running_cost = 0.0
         for i in range(self.N):
-            running_cost += X[i][self.nq:].T @ X[i][self.nq:]  # Velocity cost
             running_cost += X[i][:self.nq].T @ X[i][:self.nq]  # Position cost
+            running_cost += X[i][self.nq:].T @ X[i][self.nq:]  # Velocity cost
             running_cost += U[i].T @ U[i]                      # Acceleration cost
 
             x_next = X[i] + self.dt * dynamic_f(X[i], U[i])
@@ -111,6 +110,7 @@ class DoublePendulumOCP:
 
             tau = inv_dyn(X[i], U[i])
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
+            #not add other inequelity constraint!
 
         self.opti.subject_to(X[0] == param_x_init)
 
@@ -129,7 +129,7 @@ class DoublePendulumOCP:
         optimal_cost = self.opti.value(running_cost)
         return sol,optimal_cost
     
-    def simulation(self, number_init_state=101):
+    def simulation(self, number_init_state=config.n_init_state_ocp):
         state_buffer = []       # Buffer to store initial states
         cost_buffer = []        # Buffer to store optimal costs
         #simulation for each type of the initial state
@@ -137,13 +137,14 @@ class DoublePendulumOCP:
             q0 = np.array([self.q1_list[current_state][0], self.q2_list[current_state][0]])
             dq0 = np.array([self.v1_list[current_state][0], self.v2_list[current_state][0]])
             
-            sol,optimal_cost = self.setup_optimization(q0, dq0, self.q_des)
+            sol,optimal_cost = self.setup_ocp(q0, dq0, self.q_des)
 
             print(f"Configuration {current_state+1}:")
             print(f"  Initial position (q0): {q0}")
             print(f"  Initial velocity (dq0): {dq0}")
-            print("  Final position (q):", sol.value(self.opti.debug.value(sol.value(self.q_des))))
+            print(f"  Final position (q): {sol.value(self.opti.debug.value(sol.value(self.q_des)))}")
             print(f"total_cost {current_state+1}: ",optimal_cost)
+            print ("______________________________________________")
             
             state_buffer.append ([self.q1_list[current_state][0], self.q2_list[current_state][0],self.v1_list[current_state][0], self.v2_list[current_state][0]])
             cost_buffer.append(optimal_cost)
@@ -169,7 +170,7 @@ class DoublePendulumOCP:
 if __name__ == "__main__":
     time_start = clock()
     ocp = DoublePendulumOCP()
-    state_buffer,cost_buffer = ocp.simulation(config.number_init_state)
+    state_buffer,cost_buffer = ocp.simulation()
     
     print("Total script time:", clock() - time_start)
     ocp.save_result(state_buffer,cost_buffer,config.booltrain_file)

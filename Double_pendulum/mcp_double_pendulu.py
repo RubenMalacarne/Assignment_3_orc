@@ -19,7 +19,7 @@ from termcolor import colored
 
 class DoublePendulumOCP:
     
-    def __init__(self, robot_model="double_pendulum",number_init_state_ = config.number_init_state):
+    def __init__(self, robot_model="double_pendulum",number_init_state_ = config.n_init_state_ocp):
 
         self.robot = load(robot_model)
         self.kinDyn = KinDynComputations(self.robot.urdf, [s for s in self.robot.model.names[1:]])
