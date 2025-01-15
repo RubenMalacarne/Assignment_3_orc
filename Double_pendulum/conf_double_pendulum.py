@@ -15,7 +15,7 @@ DO_PLOTS = False
 # General_Configuration
     # goal point
     
-q_des = np.array([0, 0])
+q_des = np.array([0, 0]) #np.array([np.pi, np.pi])
 
     # weight factor 
 w_p = 1e2       # position weight
@@ -42,9 +42,9 @@ which_viewer = 'meshcat'
 simulate_real_time = 1          # flag specifying whether simulation should be real time or as fast as possible
 show_floor = False
 DISPLAY_T = 0.02              # update robot configuration in viwewer every DISPLAY_T seconds
-    # constraint parameter
-TAU_MAX = 1
-TAU_MIN = -1
+    # constraint parameter  because in the URDF file it's not present this limits
+TAU_MAX = 0.1
+TAU_MIN = -0.1
     # how to save csv file
 booltrain_file = False # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_eval
 # ----------------------------------------------------------------------------------------------------
@@ -53,14 +53,12 @@ booltrain_file = False # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_e
 # ----------------------------------------------------------------------------------------------------
 
     # horizon parameters--> N
-T = 0.20         # OCP horizon size
 dt = 0.01        # OCP time step+
-steps = int (T/dt)
-N_step =10#steps *5;   # Number of horizon step
-M_step =steps;   # Number of horizon step
+dt_sim = 0.002
+#time horizon
+N_step =100
+M_step =20
 
-N_sim = 50
-M_sim = 50
 
 n_init_state_ocp = 11
 
