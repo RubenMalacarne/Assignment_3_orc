@@ -53,5 +53,5 @@ dt_sim = 0.002
 #time horizon
 N_step =10
 M_step =1
-
+max_iter_opts = 500
 SCALE = 10000
