@@ -14,17 +14,16 @@ DO_PLOTS = False
 
 # General_Configuration
     # goal point
-    
-q_des = np.array([0, 0]) #np.array([np.pi, np.pi])
-
+# q_des = np.array([0, 0]) 
+q_des =np.array([np.pi, np.pi])
     # weight factor 
 w_p = 1e2       # position weight
-w_v = 1e-4      # velocity weight 
+w_v = 1e-1      # velocity weight 
 w_a = 1e-6      # acceleration weight
 w_final = 1e2   # final cost weight --> not used
 
-    # number of the initial states
-n_init_state_ocp = 100
+    # number of the initial states #non gli piacciono i numeri dispari
+n_init_state_ocp = 11
 
     # parameter for visualization 
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
@@ -47,26 +46,12 @@ TAU_MAX = 0.1
 TAU_MIN = -0.1
     # how to save csv file
 booltrain_file = False # TRUE: ocp_dataset_DP_train  --- FALSE: ocp_dataset_DP_eval
-# ----------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------
-# OCP and MCP configuration
-# ----------------------------------------------------------------------------------------------------
 
     # horizon parameters--> N
 dt = 0.01        # OCP time step+
 dt_sim = 0.002
 #time horizon
-N_step =100
-M_step =20
-
-
-n_init_state_ocp = 11
-
-q0      = np.array([2,2]) 
-
-# ----------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------
-    # Configuration Neural Network
-# ----------------------------------------------------------------------------------------------------
+N_step =10
+M_step =1
 
 SCALE = 10000
