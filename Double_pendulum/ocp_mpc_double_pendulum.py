@@ -357,12 +357,9 @@ if __name__ == "__main__":
     time_start = clock()
     
     save_result = True
-    
     mpc_run = True
-    
     do_train_nn = True
-    
-    with_terminal_cost_ = False
+    with_terminal_cost_ = True
     
     filename = 'dataset/ocp_dataset_DP_train.csv'
     
@@ -375,19 +372,26 @@ if __name__ == "__main__":
     
     nn = NeuralNetwork(filename,ocp_double_pendulum.nx)
     
-    if (do_train_nn):
-        nn.trainig_part()
-        nn.plot_training_history()
-        torch.save( {'model':nn.state_dict()}, "models/model.pt")
-        print("model_saved!")
-    
-    if (with_terminal_cost_):
+    if with_terminal_cost_ and mpc_run:
         ocp_double_pendulum.set_terminal_cost(nn)
-        state_buffer,cost_buffer = ocp_double_pendulum.simulation(with_terminal_cost_= with_terminal_cost_)
-    
-    if (mpc_run):
-        state_buffer,cost_buffer  = ocp_double_pendulum.simulation(with_terminal_cost_= with_terminal_cost_,mcp_check_ =mpc_run )
-        print ("finish also the mpc")
+        state_buffer, cost_buffer = ocp_double_pendulum.simulation(
+            with_terminal_cost_=with_terminal_cost_, mcp_check_=mpc_run
+        )
+        print("finish mpc with terminal cost and also the mpc")
+        
+    elif with_terminal_cost_:
+        ocp_double_pendulum.set_terminal_cost(nn)
+        state_buffer, cost_buffer = ocp_double_pendulum.simulation(with_terminal_cost_=with_terminal_cost_)
+        print("finish mpc with terminal cost")
+        
+    elif mpc_run:
+        state_buffer, cost_buffer = ocp_double_pendulum.simulation(
+            with_terminal_cost_=with_terminal_cost_, mcp_check_=mpc_run
+        )
+        print("finish also the mpc")
+        
+    else:
+        print("No action taken")
     
     
     
