@@ -32,7 +32,7 @@ class DoublePendulumOCP:
         self.q1_list,self.v1_list,self.q2_list,self.v2_list = self.set_initial_state_list()
         self.N  = config.N_step
         self.M  = config.M_step
-        
+        self.N_sim = config.N_sim
         
         self.running_costs = [None] * (self.N)
         
@@ -78,7 +78,7 @@ class DoublePendulumOCP:
         #torque become : tau_min < M(q)*ddq + h(q,dq)<tau_max
         q       = cs.SX.sym("q", self.nq)
         dq      = cs.SX.sym("dq", self.nq)
-        ddq     = cs.SX.sym("ddq", self.nq) #is our control input (acceleration) --> becaus use the inverse dynamic problem
+        ddq     = cs.SX.sym("ddq", self.nq)
 
         state   = cs.vertcat(q, dq) #vertical concatenation q and dq
         rhs = cs.vertcat(dq, ddq)   #vertical concatenation dq and ddq
@@ -89,7 +89,7 @@ class DoublePendulumOCP:
         v_b     = cs.SX.zeros(6)
         M = self.kinDyn.mass_matrix_fun()(H_b, q)[6:, 6:]       
         h = self.kinDyn.bias_force_fun()(H_b, q, v_b, dq)[6:]
-        tau = M @ ddq + h       # out control input
+        tau = M @ ddq + h      
         
         inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
 
@@ -110,9 +110,7 @@ class DoublePendulumOCP:
         
         param_x_init = self.opti.parameter(self.nx)
         param_q_des  = self.opti.parameter(self.nq)
-        x = np.concatenate([q0, dq0])
-        self.opti.set_value(param_x_init, x)
-        self.opti.set_value(param_q_des, q_des)
+        
         
         inv_dyn = self.inv_dyn
         dynamic_f = self.dynamic_f
@@ -125,10 +123,11 @@ class DoublePendulumOCP:
         
         cost = 0.0
         for i in range(iteration):
-            cost += X[i][:self.nq].T @ X[i][:self.nq]  # Position cost
-            cost += X[i][self.nq:].T @ X[i][self.nq:]  # Velocity cost
+            q_error = X[i][:self.nq] - param_q_des
             
-            cost += U[i].T @ U[i]                      # Acceleration cost
+            cost += self.w_p * (q_error.T @ q_error)
+            cost += self.w_v * (X[i][self.nq:].T @ X[i][self.nq:])
+            cost += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
             
             self.running_costs[i]=cost
             
@@ -138,35 +137,59 @@ class DoublePendulumOCP:
             tau = inv_dyn(X[i], U[i])
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
             #not add other inequelity constraint!
-        #if true, add also the terminal_cost
+        
+        if (False):
+            #if true, add also the terminal_cost
+            q_error_final = X[-1][:self.nq] - param_q_des
+            dq_final      = X[-1][self.nq:]
+            cost += self.w_final * cs.dot(q_error_final, q_error_final)
+            cost += self.w_final * cs.dot(dq_final, dq_final)
+        #in this part add terminal cost of the NN
         if (with_terminal_cost):
             terminal_cost_expr = self.NN_cost_pred(X[-1][:self.nx])
-            cost += self.w_final * terminal_cost_expr.T @ terminal_cost_expr
+            # cost += self.w_final * terminal_cost_expr.T @ terminal_cost_expr
+            cost += self.w_final * terminal_cost_expr
+
+        #ibrido
+        if(False):
+            cost += self.w_final * cs.dot(q_error_final, q_error_final)
+            cost += self.w_final * cs.dot(dq_final, dq_final)
+            cost += w_value_nn * terminal_cost_expr
 
         self.opti.subject_to(X[0] == param_x_init)
 
         self.opti.minimize(cost)
     
-        opts = {
-            "ipopt.print_level": 0,
-            "ipopt.hessian_approximation": "limited-memory",
-            "print_time": 0, # print information about execution time
-            "detect_simple_bounds": True,
-            "ipopt.max_iter": 500 #default 3000
-        }
         # opts = {
         #     "ipopt.print_level": 0,
-        #     "ipopt.tol": 1e-6,
-        #     "ipopt.constr_viol_tol": 1e-6,
-        #     "ipopt.compl_inf_tol": 1e-6,
-        #     "print_time": 0,
-        #     "detect_simple_bounds": True
+        #     "ipopt.hessian_approximation": "limited-memory",
+        #     "print_time": 0, # print information about execution time
+        #     "detect_simple_bounds": True,
+        #     "ipopt.tol": 1e-4,
+        #     "ipopt.max_iter": 500 #default 3000
         # }
+        opts = {
+            "error_on_fail": False,
+            "ipopt.print_level": 0,
+            "ipopt.tol":  1e-4,
+            "ipopt.constr_viol_tol":  1e-4,
+            "ipopt.compl_inf_tol":  1e-4,
+            "print_time": 0,                # print information about execution time
+            "detect_simple_bounds": True,
+            "ipopt.max_iter": config.SOLVER_MAX_ITER   #1000 funziona sicuro       # max number of iteration
+        }
+        
         self.opti.solver("ipopt", opts)
+        
+        x = np.concatenate([q0, dq0])
+        self.opti.set_value(param_x_init, x)
+        self.opti.set_value(param_q_des, q_des)
+        
         sol = self.opti.solve()
+        
         final_cost  = self.opti.value(cost)
         
-        #recover the solution
+        # recover the solution
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
         u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
         q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
@@ -182,62 +205,55 @@ class DoublePendulumOCP:
         final_q =  q_sol[:,iteration]
         final_dq= dq_sol[:,iteration]
 
-        
+        #to run the visual simulation
         simu = None
-        if(config.SIMULATOR=="mujoco"): #not working so well
-            from orc.utils.mujoco_simulator import MujocoSimulator
-            print("Creating simulator...")
-            simu = MujocoSimulator("double_pendulum", self.dt_sim)
-            simu.set_state(q0, dq0)
-        else:
-            r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
-            simu = RobotSimulator(config, r)
-            simu.init(q0, dq0)
-            simu.display(q0)
+        r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
+        simu = RobotSimulator(config, r)
+        simu.init(q0, dq0)
+        simu.display(q0)
+        #--------------------------------
         print("     Start the MPC loop")
         #Mcp LOOP TO solve the problem
-        for i in range(self.N):
+        for i in range(self.N_sim):
             self.opti.set_value(param_x_init, x)
-            if (True):
-                for k in range(iteration): #initial stat form x[0] until x[M-1]
-                    self.opti.set_initial( X[k] , sol.value(X[k+1])
-                                    )  #specify the variable and the value, initialize 
-                                                        #the initial point and the next iteration of the newton step
-                
-                for k in range(iteration-1): #initial cotroll inputs from U[0] until U[M-2]
-                    self.opti.set_initial (U[k], sol.value(U[k+1]))
-                    
-                #initialize the last state X[M] and the last control U[M-1]
-                self.opti.set_initial (X[iteration], sol.value(X[iteration]))
-                self.opti.set_initial (U[iteration-1], sol.value(U[iteration-1])) 
-                
-                #initiliaze dual variables:
-                lam_g0 = sol.value(self.opti.lam_g)
-                self.opti.set_initial(self.opti.lam_g, lam_g0)
-                
-            self.opti.set_value(param_x_init, x)
+            #warm start
+            for k in range(iteration): #initial stat form x[0] until x[M-1]
+                self.opti.set_initial( X[k] , sol.value(X[k+1])
+                                )  #specify the variable and the value, initialize 
+                                                    #the initial point and the next iteration of the newton step
             
+            for k in range(iteration-1): #initial cotroll inputs from U[0] until U[M-2]
+                self.opti.set_initial (U[k], sol.value(U[k+1]))
+                
+            #initialize the last state X[M] and the last control U[M-1]
+            self.opti.set_initial (X[iteration], sol.value(X[iteration]))
+            self.opti.set_initial (U[iteration-1], sol.value(U[iteration-1])) 
+            
+            #initiliaze dual variables:
+            lam_g0 = sol.value(self.opti.lam_g)
+            self.opti.set_initial(self.opti.lam_g, lam_g0)
+                
+            self.opti.set_value(param_x_init, x)
             
             try: 
                 sol = self.opti.solve()
             except: 
                 #if an exception is thrown (e.g. max number of iteration reached)
                 sol = self.opti.debug #recover the last value of the solution /another way is disable the SOLVER_MAX_ITER
-            # print ("MCP loop", i , "Comp. time %.3f s"%(stop_time-start_time_), 
-            #         "Track err: %.3f"%np.linalg.norm(x[:self.nq]-self.q_des),
-            #         "Iters ", sol.stats()["iter_count"],
-            #         "return status", sol.stats()["return_status"],
-            #         # "dq %.3f"%np.linalg.nomr(x[nq:])
-            #         )
-            #         #"  %.3f"%np.linalg) 
-            running_cost = sol.value(self.running_costs[i])
+            
+            running_cost =sol.value(cost)
             print(f"       -Step {i}: Running cost = {running_cost:.4f}")
+            #function to stop the iteration if cost is = 0  for 5 times
+            if abs(running_cost) < 1e-9:
+                cost_zero_counter += 1
+            else:
+                cost_zero_counter = 0
+            if cost_zero_counter >= 5:
+                print("STOP_CONDITION: running_cost = 0 for 5 steps.")
+                break
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
-            if(config.SIMULATOR=="mujoco"):
-                # do a proper simulation with Mujoco
-                simu.step(tau, self.dt)
-                x = np.concatenate([simu.data.qpos, simu.data.qvel])
-            elif(config.SIMULATOR=="pinocchio"):
+            #to run the visual simulation
+            if(config.SIMULATOR=="pinocchio"):
                 # do a proper simulation with Pinocchio
                 simu.simulate(tau, self.dt, int(self.dt/self.dt_sim))
                 x = np.concatenate([simu.q, simu.v])
@@ -245,7 +261,7 @@ class DoublePendulumOCP:
                 # use state predicted by the MPC as next state
                 x = sol.value(X[1]) #sample of the next state
                 simu.display(x[:self.nq]) 
-        
+            #-----------------------------------------
         return sol,final_cost ,x_sol, u_sol,final_q,final_dq,q_trajectory
     
     def simulation(self,with_terminal_cost_=False,mcp_check_ = False):
@@ -253,7 +269,7 @@ class DoublePendulumOCP:
         state_buffer = []       # Buffer to store initial states
         cost_buffer = []        # Buffer to store optimal costs
         #simulation for each type of the initial state
-        for current_state in range(number_init_state):
+        for current_state in range(18,number_init_state):
             q0 = np.array([self.q1_list[current_state][0], self.q2_list[current_state][0]])
             dq0 = np.array([self.v1_list[current_state][0], self.v2_list[current_state][0]])
             print("____________________________________________________________")
@@ -270,7 +286,8 @@ class DoublePendulumOCP:
             cost_buffer.append(final_cost)
 
             # print("     Starting animation...")
-            # animate_double_pendulum(q_trajectory)
+            # self.animate_double_pendulum(q_trajectory)
+            # plt.close('all')
             
             # print("     Plot result... ")
             # plot_results(x_sol.T,u_sol.T)
@@ -286,63 +303,37 @@ class DoublePendulumOCP:
         self.out_min = min(dataset['cost'])
         self.out_max = max(dataset['cost'])
 
-def animate_double_pendulum(X_opt):
-    fig, ax = plt.subplots()
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-2, 2)
-    line, = ax.plot([], [], 'o-', lw=2)
+    def animate_double_pendulum(self,q_trajectory):
+        L1 = config.L1
+        L2 = config.L2
+        fig, ax = plt.subplots()
+        ax.set_xlim(-L1 - L2 - 0.1, L1 + L2 + 0.1)  # set the limit using the length
+        ax.set_ylim(-L1 - L2 - 0.1, L1 + L2 + 0.1)
+        line, = ax.plot([], [], 'o-', lw=2)
 
-    def init():
-        line.set_data([], [])
-        return line,
+        def init():
+            line.set_data([], [])
+            return line,
 
-    def update(frame):
-        q1 = X_opt[frame, 0]
-        q2 = X_opt[frame, 1]
-        x1 = np.sin(q1)
-        y1 = -np.cos(q1)
-        x2 = x1 + np.sin(q2)
-        y2 = y1 - np.cos(q2)
-        line.set_data([0, x1, x2], [0, y1, y2])
-        return line,
+        def update(frame):
+            q1 = -q_trajectory[frame, 0]
+            q2 = -q_trajectory[frame, 1]
+            x1 = L1 * np.sin(q1)
+            y1 = -L1 * np.cos(q1)
+            x2 = x1 + L2 * np.sin(q2)
+            y2 = y1 - L2 * np.cos(q2)
+            line.set_data([0, x1, x2], [0, y1, y2])
+            return line,
 
-    ani = FuncAnimation(fig, update, frames=len(X_opt), init_func=init, blit=True)
-    plt.show()
-
-def plot_results(X_opt, U_opt):
-    t = np.linspace(0, 10, len(U_opt) + 1)  # Adjusted to match the length of X_opt
-    q1 = X_opt[:, 0]
-    q2 = X_opt[:, 1]
-    dq1 = X_opt[:, 2]
-    dq2 = X_opt[:, 3]
-
-    plt.figure()
-    plt.subplot(3, 1, 1)
-    plt.plot(t, q1, label='q1')
-    plt.plot(t, q2, label='q2')
-    plt.ylabel('Position')
-    plt.legend()
-
-    plt.subplot(3, 1, 2)
-    plt.plot(t, dq1, label='dq1')
-    plt.plot(t, dq2, label='dq2')
-    plt.ylabel('Velocity')
-    plt.legend()
-
-    plt.subplot(3, 1, 3)
-    plt.plot(t[:-1], U_opt, label='u')  # Adjusted to match the length of U_opt
-    plt.ylabel('Control')
-    plt.xlabel('Time')
-    plt.legend()
-
-    plt.show()
+        ani = FuncAnimation(fig, update, frames=len(q_trajectory), init_func=init, blit=True)
+        plt.show()
 
 if __name__ == "__main__":
     time_start = clock()
     with_N  = True
     with_M  = False
     mpc_run = True
-    with_terminal_cost_ = False
+    with_terminal_cost_ = True
     
     print("START THE PROGRAM:")
     print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
@@ -367,8 +358,6 @@ if __name__ == "__main__":
         )
         print("finish the mpc")
         
-    
-    
     print("Total script time:", clock() - time_start)
 
 

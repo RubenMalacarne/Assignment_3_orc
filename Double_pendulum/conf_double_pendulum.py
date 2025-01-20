@@ -6,48 +6,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time as clock, sleep
 
-# Start time
-time_start = clock()
-# General Configuration
 # Goal point
-q_des = np.array([0,0])  # Default: "pendolo a piombo" --> np.array([-np.pi, -np.pi*2])
+q_des = np.array([0, 0])  # Default: "pendolo a piombo" --> np.array([-np.pi, -np.pi*2])
 
 # Horizon parameters
-dt = 0.01     # OCP time step
-N_sim = 100    # Simulation steps
-N_step = 100  # Time horizon steps
-M_step = 30
+dt = 0.01       # OCP time step
+N_sim = 500     # Simulation steps
+N_step =  6     # Time horizon N steps
+M_step = 10     # Time Horizon M 
+
 max_iter_opts = 1000
 SCALE = 10000
-
+SOLVER_MAX_ITER = 1000
 # Initial configuration
-q0 = np.array([-np.pi, -np.pi * 2])
+q0 = np.array([np.pi, np.pi])
 # length of link 1 and 2
 L1 = 0.035  
 L2 = 0.1    
-# Constraint parameters
-# These limits are not present in the URDF file
+# Constraint parameters # These limits are not present in the URDF file
 TAU_MAX = 1
 TAU_MIN = -1
-# CSV file saving
 
 # Initial states
-n_init_state_ocp = 11  # Avoid odd numbers if disliked
+n_init_state_ocp = 101  # Avoid odd numbers if disliked
 
 # Weight factors
-w_p = 1e2   # position weight
-w_v = 0e-6  # velocity weight
-w_a = 1e-5   # Acceleration weight
-w_final = 1e1   # Final cost weight (not used)
+w_p     = 0.1   # position weight
+w_v     = 1e-4  # velocity weight
+w_a     = 1e-6  # Acceleration weight
+w_final = 1e2   # Final cost weight (not used)
 
 # Visualization parameters  
 # Simulator settings
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
 LINE_WIDTH = 1
-SIMULATOR = "ideal"  # Options: "mujoco", "pinocchio", "ideal"
+SIMULATOR = "ideal"  # Options: "pinocchio", "ideal"
 DO_PLOTS = False
 nq = 2
-
 
 # Simulation parameters
 simulate_coulomb_friction = 0  # Flag for simulating Coulomb friction

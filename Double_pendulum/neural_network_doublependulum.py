@@ -40,7 +40,8 @@ class NeuralNetwork(nn.Module):
             self.activation_type,
             nn.Linear(self.hidden_size, self.hidden_size),
             self.activation_type,
-            nn.Linear(self.hidden_size, self.output_size)
+            nn.Linear(self.hidden_size, self.output_size),
+            #self.activation_type, --> tramite l’errore di regressione, impari a rimanere grossomodo nel range corretto!!! 
         )
         self.initialize_weights()
         

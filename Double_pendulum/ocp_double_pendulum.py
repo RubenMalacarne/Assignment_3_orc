@@ -34,27 +34,29 @@ class DoublePendulumOCP:
         self.N  =    config.N_step
         self.M  =    config.M_step
         
-        
         self.q_des  = config.q_des
-        self.nx     = 2 * self.nq
+        self.nx     = 2 * self.nq   #2x2 for double pendulum
         
         self.w_p     =   config.w_p
         self.w_v     =   config.w_v
         self.w_a     =   config.w_a
         self.w_final =   config.w_final
         
-        self.inv_dyn,self.dynamic_f = self.set_dynamics()
+        self.inv_dyn,self.dynamic_f     = self.set_dynamics()
         
-        self.filename= filename
+        self.filename   = filename
         
         print("Initializeation Double_Pendulum OCP complete!")
 
+    #randomize the function
     def set_initial_state_list(self):
         
         n_qs = self.number_init_state
         n_dqs = self.number_init_state
+        
         q_min = 0
         q_max = np.pi
+        
         dq_min = 0.0
         dq_max = 8.0
 
@@ -73,9 +75,9 @@ class DoublePendulumOCP:
     
     def set_dynamics(self):
         #use the alternative multi-body dynamics modeling 
-        q       = cs.SX.sym("q", self.nq)
-        dq      = cs.SX.sym("dq", self.nq)
-        ddq     = cs.SX.sym("ddq", self.nq) #is our control input (acceleration) --> becaus use the inverse dynamic problem
+        q       = cs.SX.sym("q", self.nq)   #position
+        dq      = cs.SX.sym("dq", self.nq)  #velocity
+        ddq     = cs.SX.sym("ddq", self.nq) #acceleration is our control input --> because we use the inverse dynamic problem
 
         state   = cs.vertcat(q, dq)     #vertical concatenation q and dq
         rhs     = cs.vertcat(dq, ddq)   #vertical concatenation dq and ddq
@@ -84,81 +86,91 @@ class DoublePendulumOCP:
         #inverse dynamic function with casadi
         H_b     = cs.SX.eye(4)
         v_b     = cs.SX.zeros(6)
-        M = self.kinDyn.mass_matrix_fun()(H_b, q)[6:, 6:]        # excluding the first 6 elements (which usually represent the degrees of freedom of the basic rigid body, such as translations and rotations if the robot is floating).
-        h = self.kinDyn.bias_force_fun()(H_b, q, v_b, dq)[6:]   #excluding the base DoF
-        tau = M @ ddq + h       # out control input tau = M(q)*ddq + h(q,dq)
+        M = self.kinDyn.mass_matrix_fun()(H_b, q)[6:, 6:]      # excluding the first 6 elements 
+        #(which usually represent the degrees of freedom of the basic rigid body, such as translations and rotations if the robot is floating).
+        h = self.kinDyn.bias_force_fun()(H_b, q, v_b, dq)[6:]  # excluding the base DoF
+        tau = M @ ddq + h           # out control input tau = M(q)*ddq + h(q,dq)
 
         inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
-    
         return inv_dyn,dynamic_f
    
-    def setup_ocp(self, q0, dq0, q_des, with_N = True, with_M= False):
+    def setup_ocp(self, q0, dq0, with_N=True, with_M=False):
         self.opti = cs.Opti()
-        #set iteretion
-        iteration = 0
-        if (with_N) : iteration = self.N
-        elif (with_M) : iteration = self.M
-        elif (with_N and with_M): iteration = self.N + self.M 
-        #inizialization
-        self.cost = 0.0
-        self.running_cost = [0]*(iteration)
         
-        param_x_init = self.opti.parameter(self.nx)
-        param_q_des  = self.opti.parameter(self.nq)
-        
-        x = np.concatenate([q0, dq0])
-        
-        self.opti.set_value(param_x_init, x)
-        self.opti.set_value(param_q_des, q_des)
-        
-        #add dynamics
-        inv_dyn = self.inv_dyn
-        dynamic_f = self.dynamic_f
-        
+        if with_N and with_M:
+            iteration = self.N + self.M
+        elif with_N:
+            iteration = self.N
+        elif with_M:
+            iteration = self.M
+        else:
+            iteration = self.N  # default
+
+        # ottimization variable
         X, U = [], []
         for i in range(iteration + 1):
             X.append(self.opti.variable(self.nx))
         for i in range(iteration):
             U.append(self.opti.variable(self.nq))
         
+        # parameters (not variables!!!): stato iniziale e q_des
+        param_x_init = self.opti.parameter(self.nx)
+        param_q_des  = self.opti.parameter(self.nq)
+        
+        # Setting of the value of the parameters
+        x_init = np.concatenate([q0, dq0])
+        self.opti.set_value(param_x_init, x_init)
+        self.opti.set_value(param_q_des,  self.q_des)
+        
+        # constraint to the initial state
         self.opti.subject_to(X[0] == param_x_init)
+        
+        cost_expr = 0
+        
         for i in range(iteration):
-            self.running_cost[i] += self.w_p * X[i][:self.nq].T @ X[i][:self.nq]  # Position cost
-            self.running_cost[i] += self.w_v * X[i][self.nq:].T @ X[i][self.nq:]  # Velocity cost
-            self.running_cost[i] += self.w_a * U[i].T @ U[i]                      # Acceleration cost
+            # error of the position and velocity
+            q_error  = X[i][:self.nq] - param_q_des
+            dq_error = X[i][self.nq:]
             
-            x_next = X[i] + config.dt * dynamic_f(X[i], U[i]) #computation of the next state
-            self.opti.subject_to(X[i + 1] == x_next)
+            cost_expr += self.w_p * cs.dot(q_error,  q_error)
+            cost_expr += self.w_v * cs.dot(dq_error, dq_error)
+            cost_expr += self.w_a * cs.dot(U[i], U[i])  #acceleration lik in input
+            
+            # dynamic implementation
+            x_next = X[i] + config.dt * self.dynamic_f(X[i], U[i])
+            self.opti.subject_to(X[i+1] == x_next)
 
-            tau = inv_dyn(X[i], U[i])
+            # "tourque" limit
+            tau = self.inv_dyn(X[i], U[i])
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
-            #not add other inequelity constraint!
-            self.cost += self.running_cost[i]
         
-        self.opti.minimize(self.cost)
+        # add terminal cost
+        q_error_final  = X[-1][:self.nq] - param_q_des
+        dq_error_final = X[-1][self.nq:]
+        cost_expr     += self.w_final * cs.dot(q_error_final,  q_error_final)
+        cost_expr     += self.w_final * cs.dot(dq_error_final, dq_error_final)
         
+        self.opti.minimize(cost_expr)
+        
+        # Solver
         opts = {
-            "ipopt.print_level": 0,
-            "ipopt.hessian_approximation": "limited-memory",
-            "print_time": 0, # print information about execution time
-            "detect_simple_bounds": True,
-            "ipopt.max_iter": config.max_iter_opts #default 3000
+            "ipopt.print_level":    0,
+            "ipopt.max_iter":       config.max_iter_opts,
+            "print_time":           0,
+            "ipopt.tol":            1e-3,
+            "ipopt.constr_viol_tol":1e-6
         }
-        # opts = {
-        #     "ipopt.print_level": 0,
-        #     "ipopt.tol": 1e-6,
-        #     "ipopt.constr_viol_tol": 1e-6,
-        #     "ipopt.compl_inf_tol": 1e-6,
-        #     "print_time": 0,
-        #     "detect_simple_bounds": True
-        # }
-        
         self.opti.solver("ipopt", opts)
         sol = self.opti.solve()
-        q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
-        x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
-        u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
-        return sol,q_trajectory,x_sol,u_sol
+        
+        # Recover of the date trajectory and optimal cost
+        x_sol   = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
+        u_sol   = np.array([sol.value(U[k]) for k in range(iteration)]).T
+        q_traj  = x_sol[:self.nq, :].T
+        dq_traj = x_sol[self.nq:, :].T
+        final_cost = self.opti.value(cost_expr)
+        
+        return sol, final_cost, x_sol, u_sol, q_traj, dq_traj
     #   final_cost  = self.opti.value(cost)
     #     #recover the solution
     #     x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
@@ -190,14 +202,14 @@ def simulation(ocp_double_pendulum,with_N = True, with_M= False):
             dq0 = np.array([ocp_double_pendulum.v1_list[current_state][0], ocp_double_pendulum.v2_list[current_state][0]])
             print("____________________________________________________________")
             print(f"Start computation OCP... Configuration {current_state+1}:")
-            sol,q_trajectory,x_sol,u_sol= ocp_double_pendulum.setup_ocp(q0, dq0, ocp_double_pendulum.q_des,with_N,with_M)
+            sol, final_cost, x_sol, u_sol, q_trajectory, dq_trajectory = ocp_double_pendulum.setup_ocp(q0, dq0, with_N, with_M)
             print(f"        Initial position (q0): {q0}")
             print(f"        Initial velocity (dq0): {dq0}")
             print(f"        Desired postiion (q):  ",ocp_double_pendulum.q_des)
-            print(f"        Final_cost {current_state+1}: ",sol.value(ocp_double_pendulum.cost))
+            print(f"        Final_cost {current_state+1}: ",final_cost)
             
             state_buffer.append ([ocp_double_pendulum.q1_list[current_state][0], ocp_double_pendulum.q2_list[current_state][0],ocp_double_pendulum.v1_list[current_state][0], ocp_double_pendulum.v2_list[current_state][0]])
-            cost_buffer.append(sol.value(ocp_double_pendulum.cost))
+            cost_buffer.append(final_cost)
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print(f"Could not solve for: ")
@@ -232,7 +244,7 @@ def animate_double_pendulum(X_opt):
     L1 = config.L1
     L2 = config.L2
     fig, ax = plt.subplots()
-    ax.set_xlim(-L1 - L2 - 0.1, L1 + L2 + 0.1)  # Imposta limiti basati sulle lunghezze
+    ax.set_xlim(-L1 - L2 - 0.1, L1 + L2 + 0.1)  # set the limit using the length
     ax.set_ylim(-L1 - L2 - 0.1, L1 + L2 + 0.1)
     line, = ax.plot([], [], 'o-', lw=2)
 
@@ -241,13 +253,13 @@ def animate_double_pendulum(X_opt):
         return line,
 
     def update(frame):
-        q1 = X_opt[frame, 0]  # Angolo del primo pendolo
-        q2 = X_opt[frame, 1]  # Angolo del secondo pendolo
+        q1 = -X_opt[frame, 0]
+        q2 = -X_opt[frame, 1]
         x1 = L1 * np.sin(q1)
         y1 = -L1 * np.cos(q1)
         x2 = x1 + L2 * np.sin(q2)
         y2 = y1 - L2 * np.cos(q2)
-        line.set_data([0, x1, x2], [0, y1, y2])  # Aggiorna le coordinate della linea
+        line.set_data([0, x1, x2], [0, y1, y2])
         return line,
 
     ani = FuncAnimation(fig, update, frames=len(X_opt), init_func=init, blit=True)
@@ -257,12 +269,11 @@ if __name__ == "__main__":
     time_start = clock()
     with_N = True
     with_M = False
-    
     save_result_bool = True
     train_nn    = True
     
     print("START THE PROGRAM:")
-    print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
+    print(f"Setup choice:number initial states{config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
     print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}")
     print("press a button to continue")
     input()
