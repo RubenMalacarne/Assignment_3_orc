@@ -74,13 +74,14 @@ class DoublePendulumOCP:
         return qs,dqs,qs2,dqs2
         
     def set_dynamics(self):
-        #use the alternative multi-body dynamics modeling 
+        #use the alternative multi-body dynamics modeling
+        #torque become : tau_min < M(q)*ddq + h(q,dq)<tau_max
         q       = cs.SX.sym("q", self.nq)
         dq      = cs.SX.sym("dq", self.nq)
         ddq     = cs.SX.sym("ddq", self.nq) #is our control input (acceleration) --> becaus use the inverse dynamic problem
 
-        state   = cs.vertcat(q, dq)     #vertical concatenation q and dq
-        rhs     = cs.vertcat(dq, ddq)   #vertical concatenation dq and ddq
+        state   = cs.vertcat(q, dq) #vertical concatenation q and dq
+        rhs = cs.vertcat(dq, ddq)   #vertical concatenation dq and ddq
         
         dynamic_f  = cs.Function('f', [state, ddq], [rhs]) #dynamic function, take in input the state and ddq"=u" (x, u = ddq) and compute dx =(dq,ddq)
         #inverse dynamic function with casadi
@@ -88,7 +89,7 @@ class DoublePendulumOCP:
         v_b     = cs.SX.zeros(6)
         M = self.kinDyn.mass_matrix_fun()(H_b, q)[6:, 6:]       
         h = self.kinDyn.bias_force_fun()(H_b, q, v_b, dq)[6:]
-        tau = M @ ddq + h       # out control input tau = M(q)*ddq + h(q,dq)
+        tau = M @ ddq + h       # out control input
         
         inv_dyn = cs.Function('inv_dyn', [state, ddq], [tau])
 
@@ -100,29 +101,37 @@ class DoublePendulumOCP:
         return (NN_out+1.)/2. * (self.out_max - self.out_min) + self.out_min
     
     def setup_mpc(self,sol,optimal_cost,x,X,U,simu,iteration,param_x_init):
+        start_time_ = clock()
         print("     Start the MPC loop")
-        #MPC LOOP TO solve the problem
+        #Mcp LOOP TO solve the problem
         for i in range(self.N):
             self.opti.set_value(param_x_init, x)
             if (True):
-                for k in range(iteration): #initial stat form x[0] until x[M]
-                    self.opti.set_initial( X[k] , sol.value(X[k+1])) 
+                for k in range(iteration): #initial stat form x[0] until x[M-1]
+                    self.opti.set_initial( X[k] , sol.value(X[k+1])
+                                    )  #specify the variable and the value, initialize 
+                                                        #the initial point and the next iteration of the newton step
+                
                 for k in range(iteration-1): #initial cotroll inputs from U[0] until U[M-2]
                     self.opti.set_initial (U[k], sol.value(U[k+1]))
+                    
                 #initialize the last state X[M] and the last control U[M-1]
                 self.opti.set_initial (X[iteration], sol.value(X[iteration]))
                 self.opti.set_initial (U[iteration-1], sol.value(U[iteration-1])) 
+                
                 #initiliaze dual variables:
                 lam_g0 = sol.value(self.opti.lam_g)
                 self.opti.set_initial(self.opti.lam_g, lam_g0)
                 
             self.opti.set_value(param_x_init, x)
             
+            
             try: 
                 sol = self.opti.solve()
             except: 
                 #if an exception is thrown (e.g. max number of iteration reached)
                 sol = self.opti.debug #recover the last value of the solution /another way is disable the SOLVER_MAX_ITER
+            stop_time = clock()
             # print ("MCP loop", i , "Comp. time %.3f s"%(stop_time-start_time_), 
             #         "Track err: %.3f"%np.linalg.norm(x[:self.nq]-self.q_des),
             #         "Iters ", sol.stats()["iter_count"],
@@ -153,6 +162,7 @@ class DoublePendulumOCP:
         if (with_N) : iteration = self.N
         elif (with_M) : iteration = self.M
         elif (with_N and with_M): iteration = self.N + self.M 
+        
         param_x_init = self.opti.parameter(self.nx)
         param_q_des  = self.opti.parameter(self.nq)
         x = np.concatenate([q0, dq0])
@@ -197,7 +207,7 @@ class DoublePendulumOCP:
             "ipopt.hessian_approximation": "limited-memory",
             "print_time": 0, # print information about execution time
             "detect_simple_bounds": True,
-            "ipopt.max_iter": config.max_iter_opts #default 3000
+            "ipopt.max_iter": 500 #default 3000
         }
         # opts = {
         #     "ipopt.print_level": 0,
@@ -242,7 +252,7 @@ class DoublePendulumOCP:
             self.setup_mpc(sol,cost,x,X,U,simu,iteration,param_x_init)
         return sol,final_cost ,x_sol, u_sol,final_q,final_dq,q_trajectory
     
-    def simulation(self,with_N = True, with_M= False,with_terminal_cost_=False,mcp_check_ = False):
+    def simulation(self,with_terminal_cost_=False,mcp_check_ = False):
         number_init_state=config.n_init_state_ocp
         state_buffer = []       # Buffer to store initial states
         cost_buffer = []        # Buffer to store optimal costs
@@ -252,7 +262,7 @@ class DoublePendulumOCP:
             dq0 = np.array([self.v1_list[current_state][0], self.v2_list[current_state][0]])
             print("____________________________________________________________")
             print(f"Start computation OCP... Configuration {current_state+1}:")
-            sol,final_cost,x_sol, u_sol,final_q,final_dq,q_trajectory = self.setup_ocp(q0, dq0, self.q_des,with_N,with_M,with_terminal_cost = with_terminal_cost_,mcp_check = mcp_check_)
+            sol,final_cost,x_sol, u_sol,final_q,final_dq,q_trajectory = self.setup_ocp(q0, dq0, self.q_des,with_terminal_cost = with_terminal_cost_,mcp_check = mcp_check_)
             print(f"        Initial position (q0): {q0}")
             print(f"        Initial velocity (dq0): {dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -346,19 +356,11 @@ def plot_results(X_opt, U_opt):
 if __name__ == "__main__":
     time_start = clock()
     
-    
-    with_N = True
-    with_M = True
     save_result = True
     mpc_run = True
     do_train_nn = True
     with_terminal_cost_ = True
     
-    print("START THE PROGRAM:")
-    print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
-    print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result}, mpc_run={mpc_run}, do_train_nn={do_train_nn}, with_terminal_cost_={with_terminal_cost_}")
-    print("press a button to continue")
-    input()
     filename = 'dataset/ocp_dataset_DP_train.csv'
     
     ocp_double_pendulum = DoublePendulumOCP(filename)
