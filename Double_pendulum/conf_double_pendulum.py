@@ -11,10 +11,10 @@ q_des = np.array([0, 0])  # Default: "pendolo a piombo" --> np.array([-np.pi, -n
 
 # Horizon parameters
 dt = 0.01       # OCP time step
-N_sim = 500     # Simulation steps
-N_step =  6     # Time horizon N steps
-M_step = 10     # Time Horizon M 
-
+N_sim = 500     # Simulation steps for MPC
+N_step = 40     # Time horizon N steps for OCP
+M_step = 10     # Time Horizon M steps for OCP
+random_initial_set = True
 max_iter_opts = 1000
 SCALE = 10000
 SOLVER_MAX_ITER = 1000

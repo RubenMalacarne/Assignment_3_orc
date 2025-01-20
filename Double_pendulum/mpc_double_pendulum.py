@@ -20,7 +20,7 @@ import conf_double_pendulum as config
 from neural_network_doublependulum import NeuralNetwork
 
 from matplotlib.animation import FuncAnimation
-class DoublePendulumOCP:
+class DoublePendulumMPC:
     
     def __init__(self,filename, robot_model="double_pendulum"):
         
@@ -101,7 +101,7 @@ class DoublePendulumOCP:
         return (NN_out+1.)/2. * (self.out_max - self.out_min) + self.out_min
     
     
-    def setup_mpc(self, q0, dq0, q_des, with_N = True, with_M= False, with_terminal_cost=False, mcp_check=False):
+    def setup_mpc(self, q0, dq0, q_des, see_simulation=False,with_N = True, with_M= False, with_terminal_cost=False):
         self.opti = cs.Opti()
         iteration = self.N
         if (with_N) : iteration = self.N
@@ -208,6 +208,8 @@ class DoublePendulumOCP:
         #to run the visual simulation
         simu = None
         r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
+        
+        config.use_viewer = see_simulation
         simu = RobotSimulator(config, r)
         simu.init(q0, dq0)
         simu.display(q0)
@@ -242,7 +244,7 @@ class DoublePendulumOCP:
                 sol = self.opti.debug #recover the last value of the solution /another way is disable the SOLVER_MAX_ITER
             
             running_cost =sol.value(cost)
-            print(f"       -Step {i}: Running cost = {running_cost:.4f}")
+            #print(f"       -Step {i}: Running cost = {running_cost:.4f}")
             #function to stop the iteration if cost is = 0  for 5 times
             if abs(running_cost) < 1e-9:
                 cost_zero_counter += 1
@@ -253,6 +255,7 @@ class DoublePendulumOCP:
                 break
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
             #to run the visual simulation
+            
             if(config.SIMULATOR=="pinocchio"):
                 # do a proper simulation with Pinocchio
                 simu.simulate(tau, self.dt, int(self.dt/self.dt_sim))
@@ -261,20 +264,27 @@ class DoublePendulumOCP:
                 # use state predicted by the MPC as next state
                 x = sol.value(X[1]) #sample of the next state
                 simu.display(x[:self.nq]) 
-            #-----------------------------------------
+        #-----------------------------------------
         return sol,final_cost ,x_sol, u_sol,final_q,final_dq,q_trajectory
     
-    def simulation(self,with_terminal_cost_=False,mcp_check_ = False):
+    def simulation(self,config_initial_state=None,see_simulation=False,with_terminal_cost_=False):
         number_init_state=config.n_init_state_ocp
+        if (config_initial_state is not None and config_initial_state.size > 0):
+            number_init_state=1
         state_buffer = []       # Buffer to store initial states
         cost_buffer = []        # Buffer to store optimal costs
         #simulation for each type of the initial state
-        for current_state in range(18,number_init_state):
+        for current_state in range(number_init_state):
             q0 = np.array([self.q1_list[current_state][0], self.q2_list[current_state][0]])
             dq0 = np.array([self.v1_list[current_state][0], self.v2_list[current_state][0]])
+            
+            if (config_initial_state is not None and config_initial_state.size > 0):
+                q0 = np.array([config_initial_state[0], config_initial_state[1]])
+                dq0 = np.array([config_initial_state[2], config_initial_state[3]])
+            
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
-            sol,final_cost,x_sol, u_sol,final_q,final_dq,q_trajectory = self.setup_mpc(q0, dq0, self.q_des,with_terminal_cost = with_terminal_cost_,mcp_check = mcp_check_)
+            sol,final_cost,x_sol, u_sol,final_q,final_dq,q_trajectory = self.setup_mpc(q0, dq0, self.q_des,see_simulation,with_terminal_cost = with_terminal_cost_)
             print(f"        Initial position (q0): {q0}")
             print(f"        Initial velocity (dq0): {dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -342,20 +352,19 @@ if __name__ == "__main__":
     input()
     filename = 'dataset/ocp_dataset_DP_train.csv'
     
-    ocp_double_pendulum = DoublePendulumOCP(filename)
-    state_buffer,cost_buffer = ocp_double_pendulum.simulation()
+    mpc_double_pendulum = DoublePendulumMPC(filename)
+    state_buffer,cost_buffer = mpc_double_pendulum.simulation()
  
-    nn = NeuralNetwork(filename,ocp_double_pendulum.nx)
+    nn = NeuralNetwork(filename,mpc_double_pendulum.nx)
     
     if with_terminal_cost_:
-        ocp_double_pendulum.set_terminal_cost(nn)
-        state_buffer, cost_buffer = ocp_double_pendulum.simulation(with_terminal_cost_=with_terminal_cost_)
+        mpc_double_pendulum.set_terminal_cost(nn)
+        state_buffer, cost_buffer = mpc_double_pendulum.simulation(with_terminal_cost_=with_terminal_cost_)
         print("finish mpc with terminal cost")
         
     else:
-        state_buffer, cost_buffer = ocp_double_pendulum.simulation(
-            with_terminal_cost_=with_terminal_cost_, mcp_check_=mpc_run
-        )
+        state_buffer, cost_buffer = mpc_double_pendulum.simulation(
+            with_terminal_cost_=with_terminal_cost_)
         print("finish the mpc")
         
     print("Total script time:", clock() - time_start)

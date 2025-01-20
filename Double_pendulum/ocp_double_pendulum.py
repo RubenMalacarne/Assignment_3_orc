@@ -69,8 +69,13 @@ class DoublePendulumOCP:
         qs = np.arange(q_min, q_max + q_step, q_step).reshape(n_qs, 1)
         dqs = np.arange(dq_min, dq_max + dq_step, dq_step).reshape(n_dqs, 1)
 
-        # Velocità angolari
+        # angular velocity
         dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
+        # random position
+        if (config.random_initial_set):    #random uniform distribution initial set
+            qs = np.random.uniform(q_min, q_max, (n_qs, 1)) 
+            dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
+            dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
         return qs, dqs, qs + phi, dqs2
     
     def set_dynamics(self):
@@ -145,10 +150,10 @@ class DoublePendulumOCP:
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
         
         # add terminal cost
-        q_error_final  = X[-1][:self.nq] - param_q_des
-        dq_error_final = X[-1][self.nq:]
-        cost_expr     += self.w_final * cs.dot(q_error_final,  q_error_final)
-        cost_expr     += self.w_final * cs.dot(dq_error_final, dq_error_final)
+        # q_error_final  = X[-1][:self.nq] - param_q_des
+        # dq_error_final = X[-1][self.nq:]
+        # cost_expr     += self.w_final * cs.dot(q_error_final,  q_error_final)
+        # cost_expr     += self.w_final * cs.dot(dq_error_final, dq_error_final)
         
         self.opti.minimize(cost_expr)
         
@@ -274,7 +279,7 @@ if __name__ == "__main__":
     
     print("START THE PROGRAM:")
     print(f"Setup choice:number initial states{config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
-    print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}")
+    print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}, Random distribution {config.random_initial_set}")
     print("press a button to continue")
     input()
     filename = 'dataset/ocp_dataset_DP_train.csv'
