@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from time import time as clock, sleep
 
 # Goal point
-q_des = np.array([0, 0])  # Default: "pendolo a piombo" --> np.array([-np.pi, -np.pi*2])
+q_des = np.array([0,0])# Default: "pendolo a piombo" --> np.array([-np.pi, -np.pi*2])
 
 # Horizon parameters
 dt = 0.01       # OCP time step

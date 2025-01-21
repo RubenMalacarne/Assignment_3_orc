@@ -76,7 +76,7 @@ class DoublePendulumMPC:
         # angular velocity
         dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
         # random position
-        if (config.random_initial_set):    #random uniform distribution initial set
+        if (config.random_initial_set):  
             qs = np.random.uniform(q_min, q_max, (n_qs, 1)) 
             dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
             dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
@@ -89,8 +89,8 @@ class DoublePendulumMPC:
         dq      = cs.SX.sym("dq", self.nq)
         ddq     = cs.SX.sym("ddq", self.nq)
 
-        state   = cs.vertcat(q, dq) #vertical concatenation q and dq
-        rhs = cs.vertcat(dq, ddq)   #vertical concatenation dq and ddq
+        state   = cs.vertcat(q, dq) 
+        rhs = cs.vertcat(dq, ddq)   
         
         dynamic_f  = cs.Function('f', [state, ddq], [rhs]) #dynamic function, take in input the state and ddq"=u" (x, u = ddq) and compute dx =(dq,ddq)
         #inverse dynamic function with casadi
@@ -104,15 +104,7 @@ class DoublePendulumMPC:
 
         return inv_dyn,dynamic_f
     
-    # ---------------------------------------------------------------------
-    #              METODI PER COLLEGARE LA RETE NEURALE
-    # ---------------------------------------------------------------------
-    
     def set_terminal_cost(self, nn):
-        """
-        Salva la rete neurale (già allenata o caricata) e crea la function CasADi,
-        che restituisce il costo > 0 (avendo la NN un passaggio di exp interno).
-        """
         self.neural_network = nn
         # Nota: create_casadi_function creerà la function self.nn_func che,
         #       data X (stato), restituisce un valore di costo >= 0.
@@ -125,20 +117,9 @@ class DoublePendulumMPC:
         print("[MPC] Terminal cost from NN: set up done.")
     
     def cost_from_NN(self, x_state):
-        """
-        Richiama la rete neurale con CasADi per ottenere il costo finale.
-        x_state dev'essere un vettore di dimensione 'nx'.
-        
-        Se la rete già restituisce un valore di costo > 0, qui basta:
-            cost_pred = self.neural_network.nn_func(x_state)
-        """
         cost_pred = self.neural_network.nn_func(x_state)
         return cost_pred
 
-    # ---------------------------------------------------------------------
-    #              SETUP E RISOLUZIONE DEL PROBLEMA DI MPC
-    # ---------------------------------------------------------------------
-    
     def setup_mpc(self, q_des, see_simulation=False,
                   with_N=True, with_M=False,
                   term_cost_c=False,
@@ -219,8 +200,8 @@ class DoublePendulumMPC:
             "error_on_fail": False,
             "ipopt.print_level": 0,
             "ipopt.tol": 1e-1,
-            "ipopt.constr_viol_tol": 1e-4,
-            "ipopt.compl_inf_tol": 1e-4,
+            "ipopt.constr_viol_tol": 1e-3,
+            "ipopt.compl_inf_tol": 1e-3,
             "print_time": 0,
             "detect_simple_bounds": True,
             "ipopt.max_iter": config.SOLVER_MAX_ITER,
