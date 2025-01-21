@@ -18,13 +18,13 @@ import matplotlib.pyplot as plt
 from termcolor import colored
 
 # IMPORTA IL TUO FILE DI CONFIGURAZIONE DEL SINGOLO PENDOLO
-import conf_single_pendulum as config  # <-- Assicurati di avere L1, TAU_MIN, TAU_MAX, ecc.
-from neural_network_singlependulum import NeuralNetwork  # <-- o come l'hai chiamata
+import conf_single_pendulum as config  
+from neural_network_singlependulum import NeuralNetwork
 
 from matplotlib.animation import FuncAnimation
 
 class SinglePendulumOCP:
-    def __init__(self, filename, robot_model="single_pendulum"):
+    def __init__(self, filename):
         
         base_path = os.path.dirname(os.path.abspath(__file__))
         urdf_path = os.path.join(base_path, "Single_pendulum_description", "urdf", "single_pendulum.urdf")
@@ -113,7 +113,6 @@ class SinglePendulumOCP:
         else:
             iteration = self.N # default
             
-        # ottimization variable
         X, U = [], []
         for i in range(iteration + 1):
             X.append(self.opti.variable(self.nx))
@@ -157,7 +156,6 @@ class SinglePendulumOCP:
         # cost_expr     += self.w_final * cs.dot(q_error_final,  q_error_final)
         # cost_expr     += self.w_final * cs.dot(dq_error_final, dq_error_final)
         
-        # Minimizzazione
         self.opti.minimize(cost_expr)
         
         # Solver
@@ -189,12 +187,10 @@ def simulation(ocp_single_pendulum, with_N=True, with_M=False):
     Risolve l'OCP per ogni stato iniziale e salva i costi.
     """
     number_init_state = config.n_init_state_ocp
-    state_buffer = []       # Buffer to store initial states
-    cost_buffer = []        # Buffer to store optimal costs
-    #simulation for each type of the initial state
+    state_buffer = []      
+    cost_buffer = []       
     
     for current_state in range(number_init_state):
-        # Estrazione q0, dq0
         q0  = ocp_single_pendulum.q_list[current_state][0]
         dq0 = ocp_single_pendulum.v_list[current_state][0]
         
@@ -212,8 +208,7 @@ def simulation(ocp_single_pendulum, with_N=True, with_M=False):
             state_buffer.append([q0, dq0])
             cost_buffer.append(final_cost)
             
-            # animate_single_pendulum(q_trajectory)  # vedi sotto
-            # Se vuoi plottare, scrivi la tua funzione
+            # animate_single_pendulum(q_trajectory) 
             # plot_results(x_sol.T, u_sol.T)
             
         except RuntimeError as e:
@@ -272,6 +267,10 @@ def animate_single_pendulum(q_trajectory):
     plt.show()
 
 
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
+    
 if __name__ == "__main__":
     time_start = clock()
 

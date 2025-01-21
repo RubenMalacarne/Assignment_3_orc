@@ -69,7 +69,7 @@ class DoublePendulumMPC:
         q_step = (q_max - q_min) / (n_qs - 1)
         qs = np.arange(q_min, q_max + q_step, q_step)
         if qs.size != n_qs:
-            qs = qs[:n_qs]  # Taglia l'array se necessario
+            qs = qs[:n_qs] 
         qs = qs.reshape(n_qs, 1)
 
         dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
@@ -295,10 +295,6 @@ class DoublePendulumMPC:
         
         return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_trajectory, t_mpc)
 
-    # ---------------------------------------------------------------------
-    #          METODO PER LANCIARE LA SIMULAZIONE CON VARI STATI
-    # ---------------------------------------------------------------------
-    
     def simulation(self, with_N_=True, with_M_=False,
                    config_initial_state=None,
                    see_simulation=False,
@@ -351,11 +347,6 @@ class DoublePendulumMPC:
             # print("     Plot result... ")
             # plot_results(x_sol.T,u_sol.T)
             print ("____________________________________________________________")
-
-    # ---------------------------------------------------------------------
-    #          METODI UTILI (salvataggio, animazioni, ecc.)
-    # ---------------------------------------------------------------------
-    
     def save_result_mpc(self, save_filename="results_mpc/results_mpc_test.npz"):
         os.makedirs(os.path.dirname(save_filename), exist_ok=True)
         data_to_save = {
@@ -399,14 +390,16 @@ class DoublePendulumMPC:
         plt.show()
 
 
-# -----------------------------------------------------------------------------
-# Esempio di main
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
+    
 if __name__ == "__main__":
     time_start = clock()
     with_N  = True
     with_M  = False
     mpc_run = True
-    with_terminal_cost_NN = False
+    with_terminal_cost_NN = True
     see_simulation_ = True
     print("START THE PROGRAM:")
     print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")

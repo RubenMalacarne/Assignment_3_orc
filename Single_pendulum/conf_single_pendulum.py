@@ -27,7 +27,7 @@ TAU_MAX = value_tau
 TAU_MIN = -(value_tau)
 
 # Initial states
-n_init_state_ocp = 1  # Avoid odd numbers if disliked
+n_init_state_ocp = 10 # Avoid odd numbers if disliked
 
 # Weight factors
 w_p     = 0.1   # position weight

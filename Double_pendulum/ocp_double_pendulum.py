@@ -67,7 +67,7 @@ class DoublePendulumOCP:
         q_step = (q_max - q_min) / (n_qs - 1)
         qs = np.arange(q_min, q_max + q_step, q_step)
         if qs.size != n_qs:
-            qs = qs[:n_qs]  # Taglia l'array se necessario
+            qs = qs[:n_qs]  
         qs = qs.reshape(n_qs, 1)
 
         dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
@@ -271,6 +271,11 @@ def animate_double_pendulum(X_opt):
 
     ani = FuncAnimation(fig, update, frames=len(X_opt), init_func=init, blit=True)
     plt.show()
+
+
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
     
 if __name__ == "__main__":
     time_start = clock()

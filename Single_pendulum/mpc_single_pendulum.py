@@ -7,22 +7,19 @@ from utils.robot_simulator import RobotSimulator
 from utils.robot_loaders import loadUR
 from utils.robot_wrapper import RobotWrapper
 import torch
-
 import pandas as pd
 
 from time import time as clock
 from time import sleep
-
 import matplotlib.pyplot as plt
 from termcolor import colored
 
 import conf_single_pendulum as config
 from neural_network_singlependulum import NeuralNetwork
-
 from matplotlib.animation import FuncAnimation
 
 class SinglePendulumMPC:
-    def __init__(self, filename, robot_model="single_pendulum"):
+    def __init__(self, filename):
         
         base_path = os.path.dirname(os.path.abspath(__file__))
         urdf_path = os.path.join(base_path, "Single_pendulum_description", "urdf", "single_pendulum.urdf")
@@ -51,6 +48,7 @@ class SinglePendulumMPC:
         self.w_a     = config.w_a
         self.w_final = config.w_final
         self.w_value_nn = config.w_value_nn
+        
         self.inv_dyn, self.dynamic_f = self.set_dynamics()
         
         self.filename = filename
@@ -105,16 +103,16 @@ class SinglePendulumMPC:
     
     def set_terminal_cost(self, nn):
         """
-        Salva la rete neurale (già allenata o caricata) e crea la function CasADi,
-        che restituisce il costo > 0 (avendo la NN un passaggio di exp interno).
+        save NN (already trained) and create function casadi. 
+        and return the cost > 0 (before we have negative value)
         """
         self.neural_network = nn
         # Nota: create_casadi_function creerà la function self.nn_func che,
         #       data X (stato), restituisce un valore di costo >= 0.
         self.neural_network.create_casadi_function(
-            "single_pendulum",  # robot_name
-            "models/",          # NN_DIR
-            self.nx,            # input_size
+            "single_pendulum",  
+            "models/",          
+            self.nx,           
             load_weights=True
         )
         print("[MPC] Terminal cost from NN: set up done.")
@@ -206,6 +204,7 @@ class SinglePendulumMPC:
             cost_expr    += self.w_value_nn * cost_pred_nn
 
         self.opti.minimize(cost_expr)
+        
         #se usi la NN
         # opts = {
         #     "error_on_fail": False,
@@ -230,9 +229,11 @@ class SinglePendulumMPC:
             "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
             "ipopt.hessian_approximation": "limited-memory"
         }
+        
         self.opti.solver("ipopt", opts)
         
         sol = self.opti.solve()
+        #take minimization cost for OCP
         final_cost_ocp = self.opti.value(cost_expr)
         
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
@@ -256,7 +257,7 @@ class SinglePendulumMPC:
             
             self.opti.set_value(param_x_init, x)
             
-            # # Warmstart
+            # # Warmstart ---> try to use 
             # for k in range(iteration):
             #     self.opti.set_initial(X[k], sol.value(X[k+1]))
             # for k in range(iteration-1):
@@ -295,10 +296,7 @@ class SinglePendulumMPC:
                 x = sol.value(X[1]) #sample of the next state
                 simu.display(x[:self.nq]) 
         
-        # Fine loop
         t_mpc = clock() - t_start_mpc
-        
-        # Raccogli output finali
         q_sol = x_sol[:self.nq,:]
         dq_sol= x_sol[self.nq:,:]
         q_final   = q_sol[:, -1]
@@ -357,10 +355,6 @@ class SinglePendulumMPC:
             # print("     Plot result... ")
             # plot_results(x_sol.T,u_sol.T)
             print ("____________________________________________________________")
-
-    # ---------------------------------------------------------------------
-    #          METODI UTILI (salvataggio, animazioni, ecc.)
-    # ---------------------------------------------------------------------
     
     def save_result_mpc(self, save_filename="results_mpc/results_mpc_test.npz"):
         os.makedirs(os.path.dirname(save_filename), exist_ok=True)
@@ -400,15 +394,16 @@ class SinglePendulumMPC:
         ani = FuncAnimation(fig, update, frames=len(q_trajectory), init_func=init, blit=True)
         plt.show()
 
-
-# -----------------------------------------------------------------------------
-# Esempio di main
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
+    
 if __name__ == "__main__":
     time_start = clock()
     with_N  = True
     with_M  = False
     mpc_run = True
-    with_terminal_cost_NN = True
+    with_terminal_cost_NN = False
     see_simulation_ = True
     print("START THE PROGRAM:")
     print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")

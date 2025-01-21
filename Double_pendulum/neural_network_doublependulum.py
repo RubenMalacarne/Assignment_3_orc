@@ -165,6 +165,10 @@ class NeuralNetwork(nn.Module):
         plt.show()
 
 
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
+    
 if __name__ == "__main__":
     file_name = "models/ocp_dataset_DP_train.csv"
     net = NeuralNetwork(file_name)

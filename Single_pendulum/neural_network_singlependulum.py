@@ -111,7 +111,6 @@ class NeuralNetwork(nn.Module):
         from casadi import MX, Function
         import casadi as cs
         import l4casadi as l4c
-        # if load_weights is True, we load the neural-network weights from a ".pt" file
         if load_weights:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             nn_name = f'{NN_DIR}model_singlependulum.pt'
@@ -127,15 +126,15 @@ class NeuralNetwork(nn.Module):
                                     build_dir=f'{NN_DIR}nn_{robot_name}')
         scaled_log_cost = self.l4c_model(state)  
 
-        #da spiegare
+        #da spiegare bene
         real_log_cost = ((scaled_log_cost + 1.0)/2.0) * (self.log_max - self.log_min) + self.log_min
         cost_pred     = cs.exp(real_log_cost)  # exponent --> costo sempre > 0
         self.nn_func = Function('nn_func', [state], [cost_pred])
 
     def read_file_csv(self, file_name):
         df = pd.read_csv(file_name)
-        X_data  = df[["q","dq"]].values  # shape (N,4)
-        costs   = df["cost"].values                # shape (N,)
+        X_data  = df[["q","dq"]].values 
+        costs   = df["cost"].values           
         log_cost = np.log(costs)
         self.scaler = MinMaxScaler(feature_range=(-1, 1))
 
@@ -164,6 +163,10 @@ class NeuralNetwork(nn.Module):
         plt.grid(True)
         plt.show()
 
+
+# ---------------------------------------------------------------------
+#          MAIN(example)
+# ---------------------------------------------------------------------
 
 if __name__ == "__main__":
     file_name = "models/ocp_dataset_DP_train.csv"

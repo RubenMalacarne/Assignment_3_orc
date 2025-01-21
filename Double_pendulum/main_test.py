@@ -13,6 +13,11 @@ after is tested the case between
     5. horizon M + classic terminal cost
     6. horizon M + hybrid cost
 '''
+
+# ---------------------------------------------------------------------
+#          MAIN
+# ---------------------------------------------------------------------
+    
 if __name__ == "__main__":
     
     time_start = clock()
