@@ -64,11 +64,14 @@ class DoublePendulumOCP:
         phi = np.pi / 4  
         dq_phi = 2.0
 
+        qs = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
         q_step = (q_max - q_min) / (n_qs - 1)
-        dq_step = (dq_max - dq_min) / (n_dqs - 1)
-        qs = np.arange(q_min, q_max + q_step, q_step).reshape(n_qs, 1)
-        dqs = np.arange(dq_min, dq_max + dq_step, dq_step).reshape(n_dqs, 1)
+        qs = np.arange(q_min, q_max + q_step, q_step)
+        if qs.size != n_qs:
+            qs = qs[:n_qs]  # Taglia l'array se necessario
+        qs = qs.reshape(n_qs, 1)
 
+        dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
         # angular velocity
         dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
         # random position
