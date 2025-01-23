@@ -82,12 +82,11 @@ class SinglePendulumMPC:
         dq  = cs.SX.sym("dq", self.nq) #velocity
         ddq = cs.SX.sym("ddq",self.nq) #acceleration is our control input --> because we use the inverse dynamic problem
         
-        state = cs.vertcat(q, dq)       #vertical concatenation q and dq
-        rhs   = cs.vertcat(dq, ddq)    #vertical concatenation dq and ddq
+        state = cs.vertcat(q, dq)       
+        rhs   = cs.vertcat(dq, ddq)    
         
         dynamic_f = cs.Function('f', [state, ddq], [rhs])#dynamic function, take in input the state and ddq"=u" (x, u = ddq) and compute dx =(dq,ddq)
         #inverse dynamic function with casadi
-        #it's neccessary because in URDF is present a base link
         H_b = cs.SX.eye(4)
         v_b = cs.SX.zeros(6)
         
@@ -100,15 +99,8 @@ class SinglePendulumMPC:
         
         return inv_dyn, dynamic_f
 
-    
     def set_terminal_cost(self, nn):
-        """
-        save NN (already trained) and create function casadi. 
-        and return the cost > 0 (before we have negative value)
-        """
         self.neural_network = nn
-        # Nota: create_casadi_function creerà la function self.nn_func che,
-        #       data X (stato), restituisce un valore di costo >= 0.
         self.neural_network.create_casadi_function(
             "single_pendulum",  
             "models/",          
@@ -118,13 +110,6 @@ class SinglePendulumMPC:
         print("[MPC] Terminal cost from NN: set up done.")
     
     def cost_from_NN(self, x_state):
-        """
-        Richiama la rete neurale con CasADi per ottenere il costo finale.
-        x_state dev'essere un vettore di dimensione 'nx'.
-        
-        Se la rete già restituisce un valore di costo > 0, qui basta:
-            cost_pred = self.neural_network.nn_func(x_state)
-        """
         cost_pred = self.neural_network.nn_func(x_state)
         return cost_pred
 
@@ -204,31 +189,33 @@ class SinglePendulumMPC:
             cost_expr    += self.w_value_nn * cost_pred_nn
 
         self.opti.minimize(cost_expr)
-        
-        #se usi la NN
-        # opts = {
-        #     "error_on_fail": False,
-        #     "ipopt.print_level": 0,
-        #     "ipopt.tol": 1e-1,
-        #     "ipopt.constr_viol_tol": 1e-3,
-        #     "ipopt.compl_inf_tol": 1e-3,
-        #     "print_time": 0,
-        #     "detect_simple_bounds": True,
-        #     "ipopt.max_iter": config.SOLVER_MAX_ITER,
-        #     "ipopt.hessian_approximation": "limited-memory"
-        # }
-        #per il resto usare questa
-        opts = {
-            "error_on_fail": False,
-            "ipopt.print_level": 0,
-            "ipopt.tol":  1e-4,
-            "ipopt.constr_viol_tol":  1e-4,
-            "ipopt.compl_inf_tol":  1e-4,
-            "print_time": 0,                # print information about execution time
-            "detect_simple_bounds": True,
-            "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
-            "ipopt.hessian_approximation": "limited-memory"
-        }
+        if (term_cost_NN):
+            #se usi la NN
+            opts = {
+                "error_on_fail": False,
+                "ipopt.print_level": 0,
+                "ipopt.tol": 1e-1,
+                "ipopt.constr_viol_tol": 1e-3,
+                "ipopt.compl_inf_tol": 1e-3,
+                "print_time": 0,
+                "detect_simple_bounds": True,
+                "ipopt.max_iter": config.SOLVER_MAX_ITER,
+                "ipopt.hessian_approximation": "limited-memory"
+            }
+            
+        else:
+            #per il resto usare questa
+            opts = {
+                "error_on_fail": False,
+                "ipopt.print_level": 0,
+                "ipopt.tol":  1e-4,
+                "ipopt.constr_viol_tol":  1e-4,
+                "ipopt.compl_inf_tol":  1e-4,
+                "print_time": 0,                # print information about execution time
+                "detect_simple_bounds": True,
+                "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
+                "ipopt.hessian_approximation": "limited-memory"
+            }
         
         self.opti.solver("ipopt", opts)
         
@@ -332,8 +319,8 @@ class SinglePendulumMPC:
             self.dq0= np.array([self.v_list[current_state][0]], dtype=np.float64)
             if (config_initial_state is not None and config_initial_state.size > 0):
                 
-                self.q0 = np.array(config_initial_state[0], dtype=np.float64) 
-                self.dq0= np.array(config_initial_state[1], dtype=np.float64)
+                self.q0 = np.array([config_initial_state[0]], dtype=np.float64) 
+                self.dq0= np.array([config_initial_state[1]], dtype=np.float64)
             
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
@@ -348,12 +335,6 @@ class SinglePendulumMPC:
             
             self.state_buffer.append ([self.q_list[current_state][0],self.v_list[current_state][0],])
             self.cost_buffer.append(self.final_cost)
-            # print("     Starting animation...")
-            # self.animate_single_pendulum (q_trajectory)
-            # plt.close('all')
-            
-            # print("     Plot result... ")
-            # plot_results(x_sol.T,u_sol.T)
             print ("____________________________________________________________")
     
     def save_result_mpc(self, save_filename="results_mpc/results_mpc_test.npz"):
@@ -372,27 +353,6 @@ class SinglePendulumMPC:
         }
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")
-
-    def animate_single_pendulum (self, q_trajectory):
-        L1 = config.L1
-        fig, ax = plt.subplots()
-        ax.set_xlim(-L1  - 0.1, L1  + 0.1)
-        ax.set_ylim(-L1  - 0.1, L1  + 0.1)
-        line, = ax.plot([], [], 'o-', lw=2)
-
-        def init():
-            line.set_data([], [])
-            return line,
-
-        def update(frame):
-            q1 = -q_trajectory[frame, 0]
-            x1 = L1 * np.sin(q1)
-            y1 = -L1 * np.cos(q1)
-            line.set_data([0, x1], [0, y1])
-            return line,
-
-        ani = FuncAnimation(fig, update, frames=len(q_trajectory), init_func=init, blit=True)
-        plt.show()
 
 # ---------------------------------------------------------------------
 #          MAIN(example)

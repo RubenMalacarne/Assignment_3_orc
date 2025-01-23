@@ -125,6 +125,8 @@ class DoublePendulumMPC:
                   term_cost_c=False,
                   term_cost_NN=False,
                   term_cost_hy=False):
+        q_total_trajectory=[]
+        All_traj_predicted=[]
         #set time horizon
         if with_N and with_M:
             iteration = self.N + self.M
@@ -195,30 +197,32 @@ class DoublePendulumMPC:
             cost_expr    += self.w_value_nn * cost_pred_nn
 
         self.opti.minimize(cost_expr)
-        #se usi la NN
-        opts = {
-            "error_on_fail": False,
-            "ipopt.print_level": 0,
-            "ipopt.tol": 1e-1,
-            "ipopt.constr_viol_tol": 1e-3,
-            "ipopt.compl_inf_tol": 1e-3,
-            "print_time": 0,
-            "detect_simple_bounds": True,
-            "ipopt.max_iter": config.SOLVER_MAX_ITER,
-            "ipopt.hessian_approximation": "limited-memory"
-        }
+        if (term_cost_NN):
+            #se usi la NN
+            opts = {
+                "error_on_fail": False,
+                "ipopt.print_level": 0,
+                "ipopt.tol": 1e-1,
+                "ipopt.constr_viol_tol": 1e-2,
+                "ipopt.compl_inf_tol": 1e-2,
+                "print_time": 0,
+                "detect_simple_bounds": True,
+                "ipopt.max_iter": config.SOLVER_MAX_ITER,
+                "ipopt.hessian_approximation": "limited-memory"
+            }
+        else:
         #per il resto usare questa
-        # opts = {
-        #     "error_on_fail": False,
-        #     "ipopt.print_level": 0,
-        #     "ipopt.tol":  1e-4,
-        #     "ipopt.constr_viol_tol":  1e-4,
-        #     "ipopt.compl_inf_tol":  1e-4,
-        #     "print_time": 0,                # print information about execution time
-        #     "detect_simple_bounds": True,
-        #     "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
-        #     "ipopt.hessian_approximation": "limited-memory"
-        # }
+            opts = {
+                "error_on_fail": False,
+                "ipopt.print_level": 0,
+                "ipopt.tol":  1e-4,
+                "ipopt.constr_viol_tol":  1e-4,
+                "ipopt.compl_inf_tol":  1e-4,
+                "print_time": 0,                # print information about execution time
+                "detect_simple_bounds": True,
+                "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
+                "ipopt.hessian_approximation": "limited-memory"
+            }
         self.opti.solver("ipopt", opts)
         
         sol = self.opti.solve()
@@ -226,7 +230,7 @@ class DoublePendulumMPC:
         
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
         u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
-        q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
+        # q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
         simu=None
         r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
         config.use_viewer = see_simulation
@@ -262,7 +266,7 @@ class DoublePendulumMPC:
                 sol = self.opti.debug  # fallback
                 
             running_cost = self.opti.value(cost_expr)
-            print(f"   Step {i_sim} => Running cost = {running_cost:.4f}")
+            
             # function to stop the iteration if cost is = 0  for 5 times
             if abs(running_cost) < 1e-4:
                 cost_zero_counter += 1
@@ -271,6 +275,7 @@ class DoublePendulumMPC:
             if cost_zero_counter >= 5:
                 print("STOP_CONDITION: cost near zero for 5 steps.")
                 break
+            
             
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
             #to run the visual simulation
@@ -283,7 +288,15 @@ class DoublePendulumMPC:
                 # use state predicted by the MPC as next state
                 x = sol.value(X[1]) #sample of the next state
                 simu.display(x[:self.nq]) 
-        
+            
+            #now recover the next trajectory predicted
+            All_traj_predicted.append(np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)]))
+            actual_q = np.array([sol.value(X[0][:self.nq])])  
+            q_total_trajectory.append(actual_q)
+            
+            print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
+            
+           
         # Fine loop
         t_mpc = clock() - t_start_mpc
         
@@ -293,9 +306,12 @@ class DoublePendulumMPC:
         q_final   = q_sol[:, -1]
         dq_final  = dq_sol[:, -1]
         
-        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_trajectory, t_mpc)
+        All_traj_predicted = np.array(All_traj_predicted)
+        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,t_mpc)
 
-    def simulation(self, with_N_=True, with_M_=False,
+    def simulation(self, 
+                   with_N_=True, 
+                   with_M_=False,
                    config_initial_state=None,
                    see_simulation=False,
                    term_cost_c_=False,
@@ -328,7 +344,7 @@ class DoublePendulumMPC:
             
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
-            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_trajectory,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
+            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
             print(f"        Initial position (q0): {self.q0}")
             print(f"        Initial velocity (dq0): {self.dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -356,7 +372,8 @@ class DoublePendulumMPC:
             "final_dq": self.final_dq,
             "x_sol": self.x_sol,
             "u_sol": self.u_sol,
-            "q_trajectory": self.q_trajectory,
+            "q_trajectory": self.q_total_trajectory,
+            "All_traj_predicted":self.All_traj_predicted,
             "t_mpc": self.t_mpc,
             "q0": self.q0,
             "dq0": self.dq0,
@@ -364,30 +381,6 @@ class DoublePendulumMPC:
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")
 
-    def animate_double_pendulum(self, q_trajectory):
-        L1 = config.L1
-        L2 = config.L2
-        fig, ax = plt.subplots()
-        ax.set_xlim(-L1 - L2 - 0.1, L1 + L2 + 0.1)
-        ax.set_ylim(-L1 - L2 - 0.1, L1 + L2 + 0.1)
-        line, = ax.plot([], [], 'o-', lw=2)
-
-        def init():
-            line.set_data([], [])
-            return line,
-
-        def update(frame):
-            q1 = -q_trajectory[frame, 0]
-            q2 = -q_trajectory[frame, 1]
-            x1 = L1 * np.sin(q1)
-            y1 = -L1 * np.cos(q1)
-            x2 = x1 + L2 * np.sin(q2)
-            y2 = y1 - L2 * np.cos(q2)
-            line.set_data([0, x1, x2], [0, y1, y2])
-            return line,
-
-        ani = FuncAnimation(fig, update, frames=len(q_trajectory), init_func=init, blit=True)
-        plt.show()
 
 
 # ---------------------------------------------------------------------
@@ -399,7 +392,7 @@ if __name__ == "__main__":
     with_N  = True
     with_M  = False
     mpc_run = True
-    with_terminal_cost_NN = True
+    with_terminal_cost_NN = False
     see_simulation_ = True
     print("START THE PROGRAM:")
     print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")

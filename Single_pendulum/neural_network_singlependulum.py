@@ -169,7 +169,7 @@ class NeuralNetwork(nn.Module):
 # ---------------------------------------------------------------------
 
 if __name__ == "__main__":
-    file_name = "models/ocp_dataset_DP_train.csv"
+    file_name = "models/ocp_dataset_SP_train.csv"
     net = NeuralNetwork(file_name)
     net.trainig_part()
     net.plot_training_history()

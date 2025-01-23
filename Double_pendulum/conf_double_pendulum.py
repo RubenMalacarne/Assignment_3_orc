@@ -13,7 +13,7 @@ q_des = np.array([0,0])# Default: "pendolo a piombo" --> np.array([-np.pi, -np.p
 dt = 0.01       # OCP time step
 N_sim = 500     # Simulation steps for MPC
 N_step = 40     # Time horizon N steps for OCP
-M_step = 5     # Time Horizon M steps for OCP
+M_step = 6     # Time Horizon M steps for OCP
 random_initial_set = True
 max_iter_opts = 1000
 SOLVER_MAX_ITER = 100
@@ -23,7 +23,7 @@ q0 = np.array([np.pi, np.pi])
 L1 = 0.035  
 L2 = 0.1    
 # Constraint parameters # These limits are not present in the URDF file
-value_tau = 0.6
+value_tau = 0.7
 TAU_MAX = value_tau
 TAU_MIN = -(value_tau)
 
@@ -32,7 +32,7 @@ n_init_state_ocp = 10  # Avoid odd numbers if disliked
 
 # Weight factors
 w_p     = 0.1   # position weight
-w_v     = 1e-4  # velocity weight
+w_v     = 1e-3  # velocity weight
 w_a     = 1e-6  # Acceleration weight
 w_final = 1e2   # Final cost weight (not used)
 w_value_nn = 1e1
