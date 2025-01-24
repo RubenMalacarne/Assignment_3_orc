@@ -121,11 +121,13 @@ class DoublePendulumMPC:
         return cost_pred
 
     def setup_mpc(self, q_des, see_simulation=False,
-                  with_N=True, with_M=False,
+                  with_N=False, with_M=True,
                   term_cost_c=False,
                   term_cost_NN=False,
                   term_cost_hy=False):
         q_total_trajectory=[]
+        dq_total=[]
+        ddq_total = []
         All_traj_predicted=[]
         #set time horizon
         if with_N and with_M:
@@ -181,6 +183,8 @@ class DoublePendulumMPC:
             dq_final      = X[-1][self.nq:]
             cost_expr    += self.w_final * q_error_final.T @ q_error_final
             cost_expr    += self.w_final * dq_final.T @ dq_final
+            dq_final = X[iteration][self.nq:]
+            self.opti.subject_to(dq_final == 0.0)
         
         # Terminal cost with NN
         if term_cost_NN:
@@ -208,7 +212,8 @@ class DoublePendulumMPC:
                 "print_time": 0,
                 "detect_simple_bounds": True,
                 "ipopt.max_iter": config.SOLVER_MAX_ITER,
-                "ipopt.hessian_approximation": "limited-memory"
+                "ipopt.hessian_approximation": "limited-memory",
+                "ipopt.mu_strategy" : "adaptive"        #use to helt the convergences in NN
             }
         else:
         #per il resto usare questa
@@ -293,7 +298,10 @@ class DoublePendulumMPC:
             All_traj_predicted.append(np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)]))
             actual_q = np.array([sol.value(X[0][:self.nq])])  
             q_total_trajectory.append(actual_q)
-            
+            actual_dq = np.array([sol.value(X[0][:self.nq:])])  
+            dq_total.append(actual_dq)
+            actual_ddq = sol.value(U[0])
+            ddq_total.append(actual_ddq)
             print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
             
            
@@ -307,11 +315,11 @@ class DoublePendulumMPC:
         dq_final  = dq_sol[:, -1]
         
         All_traj_predicted = np.array(All_traj_predicted)
-        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,t_mpc)
+        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,dq_total,ddq_total,t_mpc)
 
     def simulation(self, 
-                   with_N_=True, 
-                   with_M_=False,
+                   with_N_=False, 
+                   with_M_=True,
                    config_initial_state=None,
                    see_simulation=False,
                    term_cost_c_=False,
@@ -344,7 +352,7 @@ class DoublePendulumMPC:
             
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
-            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
+            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.dq_total,self.ddq_total,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
             print(f"        Initial position (q0): {self.q0}")
             print(f"        Initial velocity (dq0): {self.dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -377,6 +385,8 @@ class DoublePendulumMPC:
             "t_mpc": self.t_mpc,
             "q0": self.q0,
             "dq0": self.dq0,
+            "dq_total":self.dq_total,
+            "ddq_total":self.ddq_total
         }
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")
@@ -400,7 +410,7 @@ if __name__ == "__main__":
     print("press a button to continue")
     input()
     
-    filename = 'dataset/ocp_dataset_DP_train.csv'
+    filename = config.csv_train
     
     nn = NeuralNetwork(
         file_name   = filename,

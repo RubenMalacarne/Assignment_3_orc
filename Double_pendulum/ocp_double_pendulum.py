@@ -151,11 +151,14 @@ class DoublePendulumOCP:
             tau = self.inv_dyn(X[i], U[i])
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
         
-        # add terminal cost
+        # add terminal cost and terminal constraint
         # q_error_final  = X[-1][:self.nq] - param_q_des
         # dq_error_final = X[-1][self.nq:]
         # cost_expr     += self.w_final * cs.dot(q_error_final,  q_error_final)
         # cost_expr     += self.w_final * cs.dot(dq_error_final, dq_error_final)
+        
+        # dq_final = X[iteration][self.nq:]
+        # self.opti.subject_to(dq_final == 0.0)
         
         self.opti.minimize(cost_expr)
         
@@ -289,7 +292,7 @@ if __name__ == "__main__":
     print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}, Random distribution {config.random_initial_set}")
     print("press a button to continue")
     input()
-    filename = 'dataset/ocp_dataset_DP_train.csv'
+    filename = config.csv_eval
     
     ocp_double_pendulum = DoublePendulumOCP(filename)
     state_buffer,cost_buffer = simulation(ocp_double_pendulum,with_N,with_M)

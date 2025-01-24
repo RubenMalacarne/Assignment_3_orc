@@ -23,20 +23,30 @@ q0 = np.array([np.pi, np.pi])
 L1 = 0.035  
 L2 = 0.1    
 # Constraint parameters # These limits are not present in the URDF file
-value_tau = 0.7
+value_tau = 1
 TAU_MAX = value_tau
 TAU_MIN = -(value_tau)
 
 # Initial states
-n_init_state_ocp = 10  # Avoid odd numbers if disliked
+n_init_state_ocp = 100  # Avoid odd numbers if disliked
 
-# Weight factors
+# # Weight factors
 w_p     = 0.1   # position weight
 w_v     = 1e-3  # velocity weight
 w_a     = 1e-6  # Acceleration weight
 w_final = 1e2   # Final cost weight (not used)
 w_value_nn = 1e1
+# w_p     = 1e1   # position weight
+# w_v     = 0e-6   # velocity weight
+# w_a     = 1e-5  # Acceleration weight
+# w_final = 1e0   # Final cost weight (not used)
 # Visualization parameters  
+
+#file
+#train csv 
+csv_train = 'dataset/ocp_dataset_DP_train.csv'
+csv_eval ='dataset/ocp_dataset_DP_eval.csv'
+
 # Simulator settings
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
 LINE_WIDTH = 1

@@ -304,7 +304,38 @@ def all_mpc_time(file_paths,key="t_mpc"):
 
     plt.tight_layout()
     plt.show()
-    
+
+def plot_joint_dynamics(file_path, keys=["q_trajectory", "dq_total", "ddq_total"]):
+    try:
+        data = np.load(file_path, allow_pickle=True)
+        trajectories = [np.vstack(data[key]) if key in data else None for key in keys]
+
+        if any(traj is None for traj in trajectories):
+            print(f"one or more key: {keys} are not present in the file.")
+            return
+
+        q_trajectory, dq_trajectory, ddq_trajectory = trajectories
+
+        fig, axs = plt.subplots(3, 1, figsize=(10, 12))
+        titles = ["Joint Positions", "Joint Velocities", "Joint Accelerations"]
+        y_labels = ["Position (rad)", "Velocity (rad/s)", "Acceleration (rad/s²)"]
+
+        for ax, traj, title, ylabel in zip(axs, trajectories, titles, y_labels):
+            for joint_idx in range(traj.shape[1]):
+                ax.plot(traj[:, joint_idx], label=f"Joint {joint_idx + 1}")
+
+            ax.set_title(title)
+            ax.set_xlabel("Iteration")
+            ax.set_ylabel(ylabel)
+            ax.legend()
+            ax.grid()
+
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        print(f"Error during loading the plots: {e}")
+ 
 # ---------------------------------------------------------------------
 #          MAIN
 # ---------------------------------------------------------------------
@@ -329,7 +360,7 @@ if __name__ == "__main__":
     
     see_simulation = True
     
-    filename_ocp = 'dataset/ocp_dataset_DP_train.csv'
+    filename_ocp = config.csv_train
     mpc_double_pendulum = DoublePendulumMPC(filename_ocp)
     nn = NeuralNetwork(filename_ocp,mpc_double_pendulum.nx)
     mpc_double_pendulum.set_terminal_cost(nn)
@@ -344,7 +375,6 @@ if __name__ == "__main__":
     print(f"boolean value: with_N={with_N}, with_M={with_M}, mpc_run={mpc_run}")
     print("PRESS A BUTTON TO CONTINUE")
     input()
-    
     
     
     counter_config = 0
@@ -378,12 +408,7 @@ if __name__ == "__main__":
         mpc_double_pendulum.save_result_mpc(filename_mpc)
         print("finish  M + NN as terminal cost and save result")
         
-        file_paths = [
-        "save_results/config_1/config_1_results_mpc_M.npz",
-        "save_results/config_1/config_1_results_mpc_M_N.npz",
-        "save_results/config_1/config_1_results_mpc_M_terminal_cost_standard.npz",
-        "save_results/config_1/config_1_results_mpc_M_NN.npz",
-        ]
+        
     file_paths = [
     "save_results/config_1/config_1_results_mpc_M.npz",
     "save_results/config_1/config_1_results_mpc_M_NN.npz",
@@ -394,6 +419,7 @@ if __name__ == "__main__":
     animate_all_simulations_together(file_paths)
     animate_plots_together(file_paths)
     all_mpc_time(file_paths)
+    plot_joint_dynamics(file_paths)
 
     print("Total script time:", clock() - time_start)
   
