@@ -155,6 +155,49 @@ class NeuralNetwork(nn.Module):
 
         return X_train, X_test, y_train, y_test, log_min, log_max
 
+    def evaluation(self, eval_file=None):
+        # Carica i dati dal file CSV
+        df = pd.read_csv(eval_file)
+        X_data  = df[["q1", "q2", "v1", "v2"]].values  # Assumendo che le colonne siano le stesse
+        costs   = df["cost"].values                   # Valori veri dei costi
+        log_cost = np.log(costs)
+
+        # Normalizzazione dei dati come fatto durante l'addestramento
+        log_cost_scaled = self.scaler.transform(log_cost.reshape(-1, 1)).flatten()
+        X_t = torch.tensor(X_data, dtype=torch.float32)
+        y_t = torch.tensor(log_cost_scaled, dtype=torch.float32).reshape(-1, 1)
+
+        # Predizioni del modello
+        self.line_stack.eval()  # Setta il modello in modalità valutazione
+        with torch.no_grad():
+            y_pred = self.line_stack(X_t).numpy()
+            y_true = y_t.numpy()
+
+            # Rimuovi la scalatura per riportare i dati nello spazio originale
+            y_pred_unscaled = ((y_pred.flatten() + 1) / 2) * (self.log_max - self.log_min) + self.log_min
+            y_true_unscaled = ((y_true.flatten() + 1) / 2) * (self.log_max - self.log_min) + self.log_min
+
+            # Metriche di valutazione
+            mse = np.mean((y_pred_unscaled - y_true_unscaled) ** 2)
+            rmse = np.sqrt(mse)
+            mae = np.mean(np.abs(y_pred_unscaled - y_true_unscaled))
+
+        print("\n--- Evaluation Results from CSV ---")
+        print(f"Mean Squared Error (MSE): {mse:.4f}")
+        print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
+        print(f"Mean Absolute Error (MAE): {mae:.4f}")
+
+        # Visualizza predizioni vs. valori veri
+        plt.figure(figsize=(10, 5))
+        plt.plot(y_true_unscaled, label="True Costs")
+        plt.plot(y_pred_unscaled, label="Predicted Costs", linestyle='--')
+        plt.xlabel("Sample Index")
+        plt.ylabel("Cost")
+        plt.title("True vs Predicted Costs (from CSV)")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+    
     def plot_training_history(self):
         plt.figure()
         plt.plot(self.history, '-o')
@@ -170,10 +213,12 @@ class NeuralNetwork(nn.Module):
 # ---------------------------------------------------------------------
     
 if __name__ == "__main__":
-    file_name = "models/ocp_dataset_DP_train.csv"
-    net = NeuralNetwork(file_name)
+    csv_train = config.csv_train 
+    csv_eval = config.csv_eval 
+    net = NeuralNetwork(csv_train)
     net.trainig_part()
     net.plot_training_history()
 
     torch.save({'model': net.state_dict()}, "models/model.pt")
     print("Model saved.")
+    net.evaluation(csv_eval)
