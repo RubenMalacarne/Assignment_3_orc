@@ -36,6 +36,14 @@ w_a     = 1e-6  # Acceleration weight
 w_final = 1e3   # Final cost weight (not used)
 w_value_nn = 1e1
 # Visualization parameters  
+
+
+#file
+#train csv 
+csv_train = 'dataset/ocp_dataset_SP_train.csv'
+csv_eval ='dataset/ocp_dataset_SP_eval.csv'
+
+
 # Simulator settings
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
 LINE_WIDTH = 1

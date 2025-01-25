@@ -114,10 +114,16 @@ class SinglePendulumMPC:
         return cost_pred
 
     def setup_mpc(self, q_des, see_simulation=False,
-                  with_N=True, with_M=False,
+                  with_N=False, with_M=True,
                   term_cost_c=False,
                   term_cost_NN=False,
                   term_cost_hy=False):
+        
+        q_total_trajectory=[]
+        dq_total=[]
+        ddq_total = []
+        All_traj_predicted=[]
+        
         self.opti = cs.Opti()
         
         #set time horizon
@@ -173,6 +179,8 @@ class SinglePendulumMPC:
             dq_final      = X[-1][self.nq:]
             cost_expr    += self.w_final * q_error_final.T @ q_error_final
             cost_expr    += self.w_final * dq_final.T @ dq_final
+            dq_final = X[iteration][self.nq:]
+            self.opti.subject_to(dq_final == 0.0)
         
         # Terminal cost with NN
         if term_cost_NN:
@@ -225,7 +233,7 @@ class SinglePendulumMPC:
         
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
         u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
-        q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
+        # q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
         simu=None
         r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
         config.use_viewer = see_simulation
@@ -282,14 +290,28 @@ class SinglePendulumMPC:
                 # use state predicted by the MPC as next state
                 x = sol.value(X[1]) #sample of the next state
                 simu.display(x[:self.nq]) 
+            
+            #now recover the next trajectory predicted
+            All_traj_predicted.append(np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)]))
+            actual_q = np.array([sol.value(X[0][:self.nq])])  
+            q_total_trajectory.append(actual_q)
+            actual_dq = np.array([sol.value(X[0][:self.nq:])])  
+            dq_total.append(actual_dq)
+            actual_ddq = sol.value(U[0])
+            ddq_total.append(actual_ddq)
+            store_iteration = i_sim
+            print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
+            
         
         t_mpc = clock() - t_start_mpc
         q_sol = x_sol[:self.nq,:]
         dq_sol= x_sol[self.nq:,:]
         q_final   = q_sol[:, -1]
         dq_final  = dq_sol[:, -1]
+        All_traj_predicted = np.array(All_traj_predicted)
+        tot_iteration = store_iteration
         
-        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_trajectory, t_mpc)
+        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,dq_total,ddq_total,t_mpc,tot_iteration)
 
     def simulation(self, with_N_=True, with_M_=False,
                    config_initial_state=None,
@@ -324,7 +346,7 @@ class SinglePendulumMPC:
             
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
-            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_trajectory,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
+            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.dq_total,self.ddq_total,self.t_mpc,self.tot_iteration = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
             print(f"        Initial position (q0): {self.q0}")
             print(f"        Initial velocity (dq0): {self.dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -346,10 +368,14 @@ class SinglePendulumMPC:
             "final_dq": self.final_dq,
             "x_sol": self.x_sol,
             "u_sol": self.u_sol,
-            "q_trajectory": self.q_trajectory,
+            "q_trajectory": self.q_total_trajectory,
+            "All_traj_predicted":self.All_traj_predicted,
             "t_mpc": self.t_mpc,
             "q0": self.q0,
             "dq0": self.dq0,
+            "dq_total":self.dq_total,
+            "ddq_total":self.ddq_total,
+            "tot_iteration" : self.tot_iteration
         }
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")
@@ -371,7 +397,7 @@ if __name__ == "__main__":
     print("press a button to continue")
     input()
     
-    filename = 'dataset/ocp_dataset_SP_train.csv'
+    filename =  config.csv_train
     
     nn = NeuralNetwork(
         file_name   = filename,

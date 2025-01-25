@@ -254,11 +254,11 @@ class DoublePendulumMPC:
             
             self.opti.set_value(param_x_init, x)
             
-            # # Warmstart
-            # for k in range(iteration):
-            #     self.opti.set_initial(X[k], sol.value(X[k+1]))
-            # for k in range(iteration-1):
-            #     self.opti.set_initial(U[k], sol.value(U[k+1]))
+            # Warmstart
+            for k in range(iteration):
+                self.opti.set_initial(X[k], sol.value(X[k+1]))
+            for k in range(iteration-1):
+                self.opti.set_initial(U[k], sol.value(U[k+1]))
             self.opti.set_initial(X[iteration], sol.value(X[iteration]))
             self.opti.set_initial(U[iteration-1], sol.value(U[iteration-1]))
             
@@ -279,6 +279,7 @@ class DoublePendulumMPC:
                 cost_zero_counter = 0
             if cost_zero_counter >= 5:
                 print("STOP_CONDITION: cost near zero for 5 steps.")
+                store_iteration = i_sim
                 break
             
             
@@ -302,20 +303,18 @@ class DoublePendulumMPC:
             dq_total.append(actual_dq)
             actual_ddq = sol.value(U[0])
             ddq_total.append(actual_ddq)
+            store_iteration = i_sim
             print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
             
-           
-        # Fine loop
         t_mpc = clock() - t_start_mpc
         
-        # Raccogli output finali
         q_sol = x_sol[:self.nq,:]
         dq_sol= x_sol[self.nq:,:]
         q_final   = q_sol[:, -1]
         dq_final  = dq_sol[:, -1]
-        
         All_traj_predicted = np.array(All_traj_predicted)
-        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,dq_total,ddq_total,t_mpc)
+        tot_iteration = store_iteration
+        return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,dq_total,ddq_total,t_mpc,tot_iteration)
 
     def simulation(self, 
                    with_N_=False, 
@@ -352,7 +351,7 @@ class DoublePendulumMPC:
             
             print("____________________________________________________________")
             print(f"Start computation MPC... Configuration {current_state+1}:")
-            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.dq_total,self.ddq_total,self.t_mpc = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
+            self.sol,self.final_cost,self.final_q,self.final_dq ,self.x_sol, self.u_sol,self.q_total_trajectory,self.All_traj_predicted,self.dq_total,self.ddq_total,self.t_mpc,self.tot_iteration = self.setup_mpc(self.q_des,see_simulation,with_N=with_N_,with_M=with_M_,term_cost_c = term_cost_c_,term_cost_NN=term_cost_NN_,term_cost_hy=term_cost_hy_)
             print(f"        Initial position (q0): {self.q0}")
             print(f"        Initial velocity (dq0): {self.dq0}")
             print(f"        Desired postiion (q):  ", self.q_des)
@@ -363,14 +362,8 @@ class DoublePendulumMPC:
             
             self.state_buffer.append ([self.q1_list[current_state][0], self.q2_list[current_state][0],self.v1_list[current_state][0], self.v2_list[current_state][0]])
             self.cost_buffer.append(self.final_cost)
-
-            # print("     Starting animation...")
-            # self.animate_double_pendulum(q_trajectory)
-            # plt.close('all')
-            
-            # print("     Plot result... ")
-            # plot_results(x_sol.T,u_sol.T)
             print ("____________________________________________________________")
+            
     def save_result_mpc(self, save_filename="results_mpc/results_mpc_test.npz"):
         os.makedirs(os.path.dirname(save_filename), exist_ok=True)
         data_to_save = {
@@ -386,7 +379,8 @@ class DoublePendulumMPC:
             "q0": self.q0,
             "dq0": self.dq0,
             "dq_total":self.dq_total,
-            "ddq_total":self.ddq_total
+            "ddq_total":self.ddq_total,
+            "tot_iteration" : self.tot_iteration
         }
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")

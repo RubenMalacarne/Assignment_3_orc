@@ -181,22 +181,7 @@ class DoublePendulumOCP:
         final_cost = self.opti.value(cost_expr)
         
         return sol, final_cost, x_sol, u_sol, q_traj, dq_traj
-    #   final_cost  = self.opti.value(cost)
-    #     #recover the solution
-    #     x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
-    #     u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
-    #     q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
-        
-    #     q_sol = x_sol[:self.nq,:]
-    #     dq_sol = x_sol[self.nq:,:]
-        
-    #     #compute the tau for each value
-    #     tau_value = np.zeros((self.nq, iteration))
-    #     for i in range(iteration):
-    #         tau_value[:,i] = inv_dyn(x_sol[:,i], u_sol[:,i]).toarray().squeeze()
-            
-    #     final_q =  q_sol[:,iteration]
-    #     final_dq= dq_sol[:,iteration]
+    
 def simulation(ocp_double_pendulum,with_N = True, with_M= False):
     number_init_state=config.n_init_state_ocp
     state_buffer = []       # Buffer to store initial states
@@ -227,12 +212,6 @@ def simulation(ocp_double_pendulum,with_N = True, with_M= False):
                 print(f"        Initial velocity (dq0): {dq0}")
             else:
                 print("Runtime error:", e)
-        # print("     Starting animation...")
-        # animate_double_pendulum(q_trajectory)
-        #animate_double_pendulum(q_trajectory)
-        # print("     Plot result... ")
-        # plot_results(x_sol.T,u_sol.T)
-        
         print ("____________________________________________________________")         
     return state_buffer,cost_buffer
     
@@ -250,32 +229,6 @@ def save_result(filename, state_buffer, cost_buffer):
         
         print(f"File saved: {filename}")
 
-def animate_double_pendulum(X_opt):
-    L1 = config.L1
-    L2 = config.L2
-    fig, ax = plt.subplots()
-    ax.set_xlim(-L1 - L2 - 0.1, L1 + L2 + 0.1)  # set the limit using the length
-    ax.set_ylim(-L1 - L2 - 0.1, L1 + L2 + 0.1)
-    line, = ax.plot([], [], 'o-', lw=2)
-
-    def init():
-        line.set_data([], [])
-        return line,
-
-    def update(frame):
-        q1 = -X_opt[frame, 0]
-        q2 = -X_opt[frame, 1]
-        x1 = L1 * np.sin(q1)
-        y1 = -L1 * np.cos(q1)
-        x2 = x1 + L2 * np.sin(q2)
-        y2 = y1 - L2 * np.cos(q2)
-        line.set_data([0, x1, x2], [0, y1, y2])
-        return line,
-
-    ani = FuncAnimation(fig, update, frames=len(X_opt), init_func=init, blit=True)
-    plt.show()
-
-
 # ---------------------------------------------------------------------
 #          MAIN(example)
 # ---------------------------------------------------------------------
@@ -288,7 +241,7 @@ if __name__ == "__main__":
     train_nn    = True
     
     print("START THE PROGRAM:")
-    print(f"Setup choice:number initial states{config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
+    print(f"Setup choice:number initial states: {config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
     print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}, Random distribution {config.random_initial_set}")
     print("press a button to continue")
     input()

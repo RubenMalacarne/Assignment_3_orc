@@ -16,8 +16,6 @@ from time import sleep
 
 import matplotlib.pyplot as plt
 from termcolor import colored
-
-# IMPORTA IL TUO FILE DI CONFIGURAZIONE DEL SINGOLO PENDOLO
 import conf_single_pendulum as config  
 from neural_network_singlependulum import NeuralNetwork
 
@@ -208,9 +206,6 @@ def simulation(ocp_single_pendulum, with_N=True, with_M=False):
             state_buffer.append([q0, dq0])
             cost_buffer.append(final_cost)
             
-            # animate_single_pendulum(q_trajectory) 
-            # plot_results(x_sol.T, u_sol.T)
-            
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print("Problema non risolvibile per:")
@@ -239,34 +234,6 @@ def save_result(filename, state_buffer, cost_buffer):
     
     print(f"File salvato: {filename}")
 
-#da sistemare
-def animate_single_pendulum(q_trajectory):
-    """
-    Esempio di animazione per il singolo pendolo,
-    assumendo una lunghezza L1.
-    """
-    L1 = config.L1
-    fig, ax = plt.subplots()
-    ax.set_xlim(-L1 - 0.1, L1 + 0.1)
-    ax.set_ylim(-L1 - 0.1, L1 + 0.1)
-    
-    line, = ax.plot([], [], 'o-', lw=2)
-    
-    def init():
-        line.set_data([], [])
-        return line,
-
-    def update(frame):
-        q = -q_trajectory[frame, 0] 
-        x1 = L1 * np.sin(q)
-        y1 = -L1 * np.cos(q)
-        line.set_data([0, x1], [0, y1])
-        return line,
-
-    ani = FuncAnimation(fig, update, frames=len(q_trajectory), init_func=init, blit=True)
-    plt.show()
-
-
 # ---------------------------------------------------------------------
 #          MAIN(example)
 # ---------------------------------------------------------------------
@@ -284,7 +251,7 @@ if __name__ == "__main__":
     print("Premi INVIO per continuare.")
     input()
 
-    filename = 'dataset/ocp_dataset_SP_train.csv'
+    filename = config.csv_eval
     
     ocp_single_pendulum = SinglePendulumOCP(filename)
     state_buffer, cost_buffer = simulation(ocp_single_pendulum, with_N, with_M)
@@ -298,6 +265,6 @@ if __name__ == "__main__":
         nn.trainig_part()
         nn.plot_training_history()
         
-        torch.save({'model': nn.state_dict()}, "models/model_singlependulum.pt")
+        torch.save({'model': nn.state_dict()}, "models/model.pt")
     
     print("Tempo totale script:", clock() - time_start)
