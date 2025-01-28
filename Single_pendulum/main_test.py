@@ -146,7 +146,8 @@ if __name__ == "__main__":
             animate_all_simulations_together(file_paths)
             animate_plots_together(file_paths)
             all_mpc_time(file_paths)
-            plot_joint_dynamics(file_paths)
+            for i in range(len(file_paths)):
+                plot_joint_dynamics(file_paths[i])
 
     print("Total script time:", clock() - time_start)
   

@@ -103,22 +103,22 @@ if __name__ == "__main__":
             # type of configuration
             counter_config += 1
             
-            # #FIRST case --> M without terminal cost
-            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M.npz'
-            # mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
-            # mpc_double_pendulum.save_result_mpc(filename_mpc)
-            # print("finish  M without terminal cost and save result")
-            # filenpz = "save_results/config_1/config_1_results_mpc_M.npz"
-            # #SECOND case --> N + M without terminal cost
-            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz'
-            # mpc_double_pendulum.simulation(with_N_=with_N,with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation)
-            # mpc_double_pendulum.save_result_mpc(filename_mpc)
-            # print("finish  N + M without terminal cost and save result")
-            # # #THIRD case --> M + classic terminal cost
-            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz'
-            # mpc_double_pendulum.simulation(with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_c_=term_cost_classic)
-            # mpc_double_pendulum.save_result_mpc(filename_mpc)
-            # print("finish M + classic terminal cost and save result")
+            #FIRST case --> M without terminal cost
+            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M.npz'
+            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
+            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            print("finish  M without terminal cost and save result")
+            filenpz = "save_results/config_1/config_1_results_mpc_M.npz"
+            #SECOND case --> N + M without terminal cost
+            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz'
+            mpc_double_pendulum.simulation(with_N_=with_N,with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation)
+            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            print("finish  N + M without terminal cost and save result")
+            # #THIRD case --> M + classic terminal cost
+            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz'
+            mpc_double_pendulum.simulation(with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_c_=term_cost_classic)
+            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            print("finish M + classic terminal cost and save result")
             #FOURTH case --> M + NN as terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_NN.npz'
             mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_NN_=term_cost_NNet)
@@ -129,6 +129,7 @@ if __name__ == "__main__":
             mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_hy_=term_cost_hybrid)
             mpc_double_pendulum.save_result_mpc(filename_mpc)
             print("finish  M + Hybrid as terminal cost and save result")
+    
     if (RESULT_step):
         #--------------------------------------------
         #                   RESULT PART
@@ -147,7 +148,8 @@ if __name__ == "__main__":
             animate_all_simulations_together(file_paths)
             animate_plots_together(file_paths)
             all_mpc_time(file_paths)
-            plot_joint_dynamics(file_paths)
+            for i in range(len(file_paths)):
+                plot_joint_dynamics(file_paths[i])
 
     print("Total script time:", clock() - time_start)
   

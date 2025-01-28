@@ -380,6 +380,7 @@ class DoublePendulumMPC:
             
             self.state_buffer.append ([self.q1_list[current_state][0], self.q2_list[current_state][0],self.v1_list[current_state][0], self.v2_list[current_state][0]])
             self.cost_buffer.append(self.final_cost)
+            
             print ("____________________________________________________________")
             
     def save_result_mpc(self, save_filename="results_mpc/results_mpc_test.npz"):
