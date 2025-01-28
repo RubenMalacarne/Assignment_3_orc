@@ -38,7 +38,6 @@ class SinglePendulumMPC:
         self.M  = config.M_step
         self.N_sim = config.N_sim
         
-        self.running_costs = [None] * (self.N)
         
         self.q_des  = config.q_des
         self.nx     = 2 * self.nq   #2x1 for single pendulum
@@ -65,16 +64,23 @@ class SinglePendulumMPC:
         dq_min = 0.0
         dq_max = 8.0
         
+        q1_list = np.zeros((self.number_init_state, 1))
+        v1_list = np.zeros((self.number_init_state, 1))
+        
         if config.random_initial_set:
             # random points
-            qs  = np.random.uniform(q_min,  q_max,  (n_qs, 1))
-            dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
+            q1_list = np.random.uniform(q_min,  q_max,  (self.number_init_state, 1))
+            v1_list = np.random.uniform(dq_min, dq_max, (self.number_init_state, 1))
         else:
             # simple way
-            qs  = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
-            dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
+            q_lin  = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
+            dq_lin = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
+            for i in range(self.number_init_state):
+                
+                q1_list[i, 0] = q_lin[i]
+                v1_list[i, 0] = dq_lin[i]
+        return q1_list, v1_list
 
-        return qs, dqs
 
     def set_dynamics(self):
         #use the alternative multi-body dynamics modeling 
@@ -118,14 +124,10 @@ class SinglePendulumMPC:
                   term_cost_c=False,
                   term_cost_NN=False,
                   term_cost_hy=False):
-        
         q_total_trajectory=[]
         dq_total=[]
         ddq_total = []
         All_traj_predicted=[]
-        
-        self.opti = cs.Opti()
-        
         #set time horizon
         if with_N and with_M:
             iteration = self.N + self.M
@@ -134,8 +136,9 @@ class SinglePendulumMPC:
         elif with_M:
             iteration = self.M
         else:
-            iteration = self.N  # fallback
+            iteration = self.N  
 
+        self.opti = cs.Opti()
         
         param_x_init = self.opti.parameter(self.nx)
         param_q_des  = self.opti.parameter(self.nq)
@@ -149,19 +152,20 @@ class SinglePendulumMPC:
         for i in range(iteration):
             U.append(self.opti.variable(self.nq))
         
-        x_init = np.array([self.q0, self.dq0])
+        x_init = np.concatenate([self.q0, self.dq0])
         self.opti.set_value(param_x_init, x_init)
         self.opti.set_value(param_q_des,  q_des)
         
         self.opti.subject_to(X[0] == param_x_init)
         
+        self.running_costs = [None] * (iteration)
         cost_expr = 0.0
-        
         for i in range(iteration):
             q_error = X[i][:self.nq] - param_q_des
+            dq_error = X[i][self.nq:]
             
             cost_expr += self.w_p * (q_error.T @ q_error)
-            cost_expr += self.w_v * (X[i][self.nq:].T @ X[i][self.nq:])
+            cost_expr += self.w_v * (dq_error.T @ dq_error)
             cost_expr += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
             
             self.running_costs[i]=cost_expr
@@ -185,7 +189,9 @@ class SinglePendulumMPC:
         # Terminal cost with NN
         if term_cost_NN:
             cost_pred_nn = self.cost_from_NN(X[-1])  # x[-1] in CasADi
+            dq_final      = X[-1][self.nq:]
             cost_expr   += self.w_value_nn * cost_pred_nn
+            self.opti.subject_to(dq_final == 0.0)
         
         # Terminal cost "Hybrid"
         if term_cost_hy:
@@ -195,6 +201,7 @@ class SinglePendulumMPC:
             cost_expr    += self.w_final * dq_final.T @  dq_final
             cost_pred_nn  = self.cost_from_NN(X[-1])
             cost_expr    += self.w_value_nn * cost_pred_nn
+            self.opti.subject_to(dq_final == 0.0)
 
         self.opti.minimize(cost_expr)
         if (term_cost_NN):
@@ -203,16 +210,17 @@ class SinglePendulumMPC:
                 "error_on_fail": False,
                 "ipopt.print_level": 0,
                 "ipopt.tol": 1e-1,
-                "ipopt.constr_viol_tol": 1e-3,
-                "ipopt.compl_inf_tol": 1e-3,
+                "ipopt.constr_viol_tol": 1e-2,
+                "ipopt.compl_inf_tol": 1e-2,
                 "print_time": 0,
                 "detect_simple_bounds": True,
                 "ipopt.max_iter": config.SOLVER_MAX_ITER,
-                "ipopt.hessian_approximation": "limited-memory"
+                "ipopt.hessian_approximation": "limited-memory",
+                # "ipopt.mu_strategy" : "adaptive"        #use to helt the convergences in NN
             }
-            
         else:
-            #per il resto usare questa
+        #per il resto usare questa
+        
             opts = {
                 "error_on_fail": False,
                 "ipopt.print_level": 0,
@@ -224,11 +232,20 @@ class SinglePendulumMPC:
                 "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
                 "ipopt.hessian_approximation": "limited-memory"
             }
-        
+        if(iteration>30):
+            #caso con M e N ho degli out of range quindi usato la stessa che si è usata in OCP
+ 
+            opts = {
+                "ipopt.print_level":    0,
+                "ipopt.max_iter":       config.max_iter_opts,
+                "print_time":           0,
+                "ipopt.tol":            1e-3,
+                "ipopt.constr_viol_tol":1e-6
+            }
+            
         self.opti.solver("ipopt", opts)
         
         sol = self.opti.solve()
-        #take minimization cost for OCP
         final_cost_ocp = self.opti.value(cost_expr)
         
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
@@ -246,17 +263,18 @@ class SinglePendulumMPC:
         t_start_mpc = clock()
         print("Start the MPC loop ...")
         
+        previous_cost = None
+        cost_zero_counter = 0 
         x = x_init.copy()
-        
         for i_sim in range(self.N_sim):
             
             self.opti.set_value(param_x_init, x)
             
-            # # Warmstart ---> try to use 
-            # for k in range(iteration):
-            #     self.opti.set_initial(X[k], sol.value(X[k+1]))
-            # for k in range(iteration-1):
-            #     self.opti.set_initial(U[k], sol.value(U[k+1]))
+            # Warmstart
+            for k in range(iteration):
+                self.opti.set_initial(X[k], sol.value(X[k+1]))
+            for k in range(iteration-1):
+                self.opti.set_initial(U[k], sol.value(U[k+1]))
             self.opti.set_initial(X[iteration], sol.value(X[iteration]))
             self.opti.set_initial(U[iteration-1], sol.value(U[iteration-1]))
             
@@ -269,15 +287,19 @@ class SinglePendulumMPC:
                 sol = self.opti.debug  # fallback
                 
             running_cost = self.opti.value(cost_expr)
-            print(f"   Step {i_sim} => Running cost = {running_cost:.4f}")
-            # function to stop the iteration if cost is = 0  for 5 times
-            if abs(running_cost) < 1e-4:
+            
+
+            if (abs(running_cost) < 1e-4) or (previous_cost is not None and abs(running_cost - previous_cost) < 1e-4):
                 cost_zero_counter += 1
             else:
-                cost_zero_counter = 0
-            if cost_zero_counter >= 5:
-                print("STOP_CONDITION: cost near zero for 5 steps.")
+                cost_zero_counter = 0 
+
+
+            if cost_zero_counter >= 3:
+                print(f"STOP_CONDITION: Cost below 1e-4 for 5 consecutive iterations")
                 break
+            previous_cost = running_cost
+            
             
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
             #to run the visual simulation
@@ -302,18 +324,17 @@ class SinglePendulumMPC:
             store_iteration = i_sim
             print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
             
-        
         t_mpc = clock() - t_start_mpc
+        
         q_sol = x_sol[:self.nq,:]
         dq_sol= x_sol[self.nq:,:]
         q_final   = q_sol[:, -1]
         dq_final  = dq_sol[:, -1]
         All_traj_predicted = np.array(All_traj_predicted)
         tot_iteration = store_iteration
-        
         return (sol, running_cost, q_final, dq_final, x_sol, u_sol, q_total_trajectory, All_traj_predicted,dq_total,ddq_total,t_mpc,tot_iteration)
 
-    def simulation(self, with_N_=True, with_M_=False,
+    def simulation(self, with_N_=False, with_M_=True,
                    config_initial_state=None,
                    see_simulation=False,
                    term_cost_c_=False,

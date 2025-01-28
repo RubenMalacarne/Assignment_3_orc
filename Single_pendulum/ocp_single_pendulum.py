@@ -64,16 +64,22 @@ class SinglePendulumOCP:
         dq_min = 0.0
         dq_max = 8.0
         
+        q1_list = np.zeros((self.number_init_state, 1))
+        v1_list = np.zeros((self.number_init_state, 1))
+        
         if config.random_initial_set:
             # random points
-            qs  = np.random.uniform(q_min,  q_max,  (n_qs, 1))
-            dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
+            q1_list = np.random.uniform(q_min,  q_max,  (self.number_init_state, 1))
+            v1_list = np.random.uniform(dq_min, dq_max, (self.number_init_state, 1))
         else:
             # simple way
-            qs  = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
-            dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
-
-        return qs, dqs
+            q_lin  = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
+            dq_lin = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
+            for i in range(self.number_init_state):
+                
+                q1_list[i, 0] = q_lin[i]
+                v1_list[i, 0] = dq_lin[i]
+        return q1_list, v1_list
 
     def set_dynamics(self):
         #use the alternative multi-body dynamics modeling 

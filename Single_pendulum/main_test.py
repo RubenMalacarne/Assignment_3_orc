@@ -20,16 +20,16 @@ case are:
 if __name__ == "__main__":
     
     time_start = clock()
-    OCP_step = False
-    NN_step = False
-    MPC_step = False
-    NN_step = False
+    OCP_step = True
+    NN_step = True
+    MPC_step = True
     RESULT_step = True
-    #STATES_CONSIDER
+    
+    #STATES_CONSIDER FOR MPC
     config_1 = np.array([-np.pi, 0.050])
-    config_2 = np.array([np.deg2rad(30),0.50]) 
-    config_3 = np.array([np.deg2rad(-30), 0.50])
-    total_config = [config_1, config_2, config_3]
+    # config_2 = np.array([np.deg2rad(30),0.50]) 
+    # config_3 = np.array([np.deg2rad(-30), 0.50])
+    total_config = [config_1]#, config_2, config_3]
     
     if (OCP_step):
         #--------------------------------------------
@@ -40,6 +40,7 @@ if __name__ == "__main__":
         with_M = False
         save_result_bool = True
         train_nn    = True
+        
         filename = config.csv_train
         print("START OCP:")
         print(f"Setup choice:number initial states: {config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
@@ -71,7 +72,7 @@ if __name__ == "__main__":
 
         torch.save({'model': net.state_dict()}, "models/model.pt")
         print("Model saved.")
-        net.evaluation(csv_eval)
+        net.evaluaunation(csv_eval)
         
     if (MPC_step):
         #--------------------------------------------
@@ -83,12 +84,12 @@ if __name__ == "__main__":
         term_cost_NNet=True
         term_cost_hybrid=True
         
-        see_simulation = True
+        see_simulation = False
         
         filename_ocp = config.csv_train
-        mpc_double_pendulum = SinglePendulumMPC(filename_ocp)
-        nn = NeuralNetwork(filename_ocp,mpc_double_pendulum.nx)
-        mpc_double_pendulum.set_terminal_cost(nn)
+        mpc_single_pendulum = SinglePendulumMPC(filename_ocp)
+        nn = NeuralNetwork(filename_ocp,mpc_single_pendulum.nx)
+        mpc_single_pendulum.set_terminal_cost(nn)
         
         print("SIMULATION IS READY TO START:")
         print(f"Setup choice: N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
@@ -103,28 +104,30 @@ if __name__ == "__main__":
             
             #FIRST case --> M without terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M.npz'
-            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            mpc_single_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
+            mpc_single_pendulum.save_result_mpc(filename_mpc)
             print("finish  M without terminal cost and save result")
             filenpz = "save_results/config_1/config_1_results_mpc_M.npz"
-            
-            # #SECOND case --> N + M without terminal cost
+            #SECOND case --> N + M without terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz'
-            mpc_double_pendulum.simulation(with_N,config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            mpc_single_pendulum.simulation(with_N_=with_N,with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation)
+            mpc_single_pendulum.save_result_mpc(filename_mpc)
             print("finish  N + M without terminal cost and save result")
-            
             # #THIRD case --> M + classic terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz'
-            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            mpc_single_pendulum.simulation(with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_c_=term_cost_classic)
+            mpc_single_pendulum.save_result_mpc(filename_mpc)
             print("finish M + classic terminal cost and save result")
-            
-            # #FOURTH case --> M + NN as terminal cost
+            # FOURTH case --> M + NN as terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_NN.npz'
-            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_NN_=term_cost_NNet)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            mpc_single_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_NN_=term_cost_NNet)
+            mpc_single_pendulum.save_result_mpc(filename_mpc)
             print("finish  M + NN as terminal cost and save result")
+            # #FIVETH case --> M + Hybrid as terminal cost
+            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_HY.npz'
+            # mpc_single_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_hy_=term_cost_hybrid)
+            # mpc_single_pendulum.save_result_mpc(filename_mpc)
+            # print("finish  M + Hybrid as terminal cost and save result")
             
     if (RESULT_step):
         #--------------------------------------------

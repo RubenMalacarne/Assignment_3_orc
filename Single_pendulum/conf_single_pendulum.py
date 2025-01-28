@@ -12,11 +12,11 @@ q_des = np.array([0])# Default: "pendolo a piombo" --> np.array([-np.pi, -np.pi*
 # Horizon parameters
 dt = 0.01       # OCP time step
 N_sim = 200     # Simulation steps for MPC
-N_step = 40     # Time horizon N steps for OCP
+N_step = 100     # Time horizon N steps for OCP
 M_step = 5     # Time Horizon M steps for OCP
 random_initial_set = True
 max_iter_opts = 1000
-SOLVER_MAX_ITER = 100
+SOLVER_MAX_ITER = 1100
 # Initial configuration
 q0 = np.array([np.pi])
 # length of link 1 and 2
@@ -30,11 +30,11 @@ TAU_MIN = -(value_tau)
 n_init_state_ocp = 1100 # Avoid odd numbers if disliked
 
 # Weight factors
-w_p     = 0.1   # position weight
-w_v     = 1e-4  # velocity weight
+w_p     = 1e2   # position weight
+w_v     = 1e-3  # velocity weight
 w_a     = 1e-6  # Acceleration weight
-w_final = 1e3   # Final cost weight (not used)
-w_value_nn = 1e1
+w_final = 1e2   # Final cost weight (not used)
+w_value_nn = 1e-2
 # Visualization parameters  
 
 
