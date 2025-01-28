@@ -217,7 +217,51 @@ class NeuralNetwork(nn.Module):
         plt.legend()
         plt.grid(True)
         plt.show()
+        
+        sort_idx = np.argsort(y_true_unscaled)
+        sorted_true = y_true_unscaled[sort_idx]
+        sorted_pred = y_pred_unscaled[sort_idx]
+        
+        plt.plot(sorted_true, 'b-', label='True Costs', linewidth=2)
+        plt.plot(sorted_pred, 'r--', label='Predicted Costs', linewidth=1.5)
+        
+        plt.fill_between(
+            np.arange(len(sorted_true)), 
+            sorted_true, 
+            sorted_pred,
+            where=(sorted_pred > sorted_true),
+            color='red', 
+            alpha=0.1,
+            label='Overestimation'
+        )
+        plt.fill_between(
+            np.arange(len(sorted_true)), 
+            sorted_true, 
+            sorted_pred,
+            where=(sorted_pred < sorted_true),
+            color='blue', 
+            alpha=0.1,
+            label='Underestimation'
+        )
+        
+        plt.xlabel("Samples (ordered by true cost)")
+        plt.ylabel("Cost")
+        plt.title("True vs Predicted Costs Comparison")
+        plt.legend()
+        plt.grid(True)
+        
     
+        diff_table = pd.DataFrame({
+            'True Cost': y_true_unscaled[:10],
+            'Predicted Cost': y_true_unscaled[:10],
+            'Absolute Error': np.abs(y_pred_unscaled[:10] - y_true_unscaled[:10]),
+            'Relative Error (%)': 100*np.abs((y_pred_unscaled[:10] - y_true_unscaled[:10])/y_true_unscaled[:10])
+        })
+        
+        print("\n=== Error Analysis - First 10 Samples ===")
+        print(diff_table.round(4))
+        plt.show()
+        
     def plot_training_history(self):
         plt.figure()
         plt.plot(self.history, '-o')
@@ -226,6 +270,7 @@ class NeuralNetwork(nn.Module):
         plt.title("Training History")
         plt.grid(True)
         plt.show()
+    
 
 
 # ---------------------------------------------------------------------

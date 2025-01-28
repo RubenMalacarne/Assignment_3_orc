@@ -18,11 +18,12 @@ case are:
 if __name__ == "__main__":
     
     time_start = clock()
-    OCP_step = False
-    NN_step = False
-    MPC_step = False
-    RESULT_step = True
+    OCP_step =      False
+    NN_step =       True
+    MPC_step =      False
+    RESULT_step =   False
     
+    see_simulation = False
     #STATES_CONSIDER FOR MPC
     config_1 = np.array([-np.pi, -np.pi*2, 0.050, 0.10])
     config_2 = np.array([np.deg2rad(30), np.deg2rad(30), 0.50, 0.10]) 
@@ -84,8 +85,6 @@ if __name__ == "__main__":
         term_cost_classic=True
         term_cost_NNet=True
         term_cost_hybrid=True
-        
-        see_simulation = True
         
         filename_ocp = config.csv_train
         mpc_double_pendulum = DoublePendulumMPC(filename_ocp)
