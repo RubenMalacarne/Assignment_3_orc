@@ -20,7 +20,7 @@ if __name__ == "__main__":
     time_start = clock()
     OCP_step = False
     NN_step = False
-    MPC_step = True
+    MPC_step = False
     RESULT_step = True
     
     #STATES_CONSIDER FOR MPC
@@ -38,14 +38,15 @@ if __name__ == "__main__":
         with_M = False
         save_result_bool = True
         train_nn    = True
+        
         filename = config.csv_train
         print("START OCP:")
         print(f"Setup choice:number initial states: {config.n_init_state_ocp}, N={config.N_step}, M={config.M_step}, tau_min and max={config.TAU_MAX}, max_iter={config.max_iter_opts}")
-        print(f"boolean value: with_N={with_N}, with_M={with_M}, save_result={save_result_bool}, train_nn={train_nn}, Random distribution {config.random_initial_set}")
+        print(f"boolean value: with_N={with_N}, save_result={save_result_bool}, train_nn={train_nn}, Random distribution {config.random_initial_set}")
         # print("press a button to continue")
         # input()
         ocp_double_pendulum = DoublePendulumOCP(filename)
-        state_buffer,cost_buffer = simulation(ocp_double_pendulum,with_N,with_M)
+        state_buffer,cost_buffer = simulation(ocp_double_pendulum,with_N)
         
         if (save_result_bool):
             save_result(filename,state_buffer,cost_buffer)
@@ -72,13 +73,13 @@ if __name__ == "__main__":
 
         torch.save({'model': net.state_dict()}, "models/model.pt")
         print("Model saved.")
-        net.evaluation(csv_eval)
+        net.evaluaunation(csv_eval)
     
     if (MPC_step):
         #--------------------------------------------
         #                   MPC PART
         #--------------------------------------------
-        with_N  = False
+        with_N  = True
         with_M  = True
         term_cost_classic=True
         term_cost_NNet=True
@@ -102,31 +103,32 @@ if __name__ == "__main__":
             # type of configuration
             counter_config += 1
             
-            #FIRST case --> M without terminal cost
-            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M.npz'
-            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
-            print("finish  M without terminal cost and save result")
-            filenpz = "save_results/config_1/config_1_results_mpc_M.npz"
-            # breakpoint()
+            # #FIRST case --> M without terminal cost
+            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M.npz'
+            # mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
+            # mpc_double_pendulum.save_result_mpc(filename_mpc)
+            # print("finish  M without terminal cost and save result")
+            # filenpz = "save_results/config_1/config_1_results_mpc_M.npz"
             # #SECOND case --> N + M without terminal cost
-            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz'
-            mpc_double_pendulum.simulation(with_N,config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
-            print("finish  N + M without terminal cost and save result")
-            
-            # #THIRD case --> M + classic terminal cost
-            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz'
-            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation)
-            mpc_double_pendulum.save_result_mpc(filename_mpc)
-            print("finish M + classic terminal cost and save result")
-            
-            # #FOURTH case --> M + NN as terminal cost
+            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz'
+            # mpc_double_pendulum.simulation(with_N_=with_N,with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation)
+            # mpc_double_pendulum.save_result_mpc(filename_mpc)
+            # print("finish  N + M without terminal cost and save result")
+            # # #THIRD case --> M + classic terminal cost
+            # filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz'
+            # mpc_double_pendulum.simulation(with_M_=with_M,config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_c_=term_cost_classic)
+            # mpc_double_pendulum.save_result_mpc(filename_mpc)
+            # print("finish M + classic terminal cost and save result")
+            #FOURTH case --> M + NN as terminal cost
             filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_NN.npz'
             mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_NN_=term_cost_NNet)
             mpc_double_pendulum.save_result_mpc(filename_mpc)
             print("finish  M + NN as terminal cost and save result")
-            
+            #FIVETH case --> M + Hybrid as terminal cost
+            filename_mpc = f'save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_HY.npz'
+            mpc_double_pendulum.simulation(config_initial_state = config_init_state,see_simulation=see_simulation,term_cost_hy_=term_cost_hybrid)
+            mpc_double_pendulum.save_result_mpc(filename_mpc)
+            print("finish  M + Hybrid as terminal cost and save result")
     if (RESULT_step):
         #--------------------------------------------
         #                   RESULT PART
@@ -139,6 +141,7 @@ if __name__ == "__main__":
             f"save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_NN.npz",
             f"save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_N.npz",
             f"save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_terminal_cost_standard.npz",
+            f"save_results/config_{counter_config}/config_{counter_config}_results_mpc_M_HY.npz",
             ]
             plot_all_trajectories(file_paths)
             animate_all_simulations_together(file_paths)

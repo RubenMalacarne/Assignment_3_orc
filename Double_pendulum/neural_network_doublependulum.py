@@ -15,13 +15,13 @@ import conf_double_pendulum as config
 
 class NeuralNetwork(nn.Module):
     """ A simple feedforward neural network that predicts the *log* of the cost (scaled). """
-    def __init__(self, file_name,
+    def __init__(self, file_name =config.csv_train,
                  input_size = 4,
-                 hidden_size = 12,
+                 hidden_size = 64,
                  output_size = 1,
-                 n_epochs=100,
+                 n_epochs=500,
                  batch_size=10,
-                 lr=0.0001,
+                 lr=0.01,
                  activation_type=nn.Tanh()):
         super().__init__()
 
@@ -41,17 +41,32 @@ class NeuralNetwork(nn.Module):
         self.batch_size    = batch_size
 
         self.line_stack = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
+            nn.Linear(self.input_size, self.hidden_size),        
+            # nn.BatchNorm1d(self.hidden_size),
             self.activation,
             nn.Linear(self.hidden_size, self.hidden_size),
+            # nn.BatchNorm1d(self.hidden_size),
             self.activation,
             nn.Linear(self.hidden_size, self.output_size)
         )
         self.initialize_weights()
 
         self.loss_fn    = nn.MSELoss()
-        self.optimizer  = optim.Adam(self.line_stack.parameters(), lr=lr)
+        self.optimizer = optim.Adam(
+            self.line_stack.parameters(),
+            # lr=lr,
+            # weight_decay=1e-4  # iperparametro da regolare
+        )
+
         self.history    = []
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer,
+            mode='min',
+            factor=0.5, 
+            patience=10,  # se per 10 epoche non migliora la metrica
+            verbose=True
+        )
+
         # self.ub = 1.0  #ub --> upper bound: used to produce dates with un upper limits, to prevent possible out of range 
         # self.batch_start = torch.arange(0, len(self.X_train_t), self.batch_size)
 
@@ -66,10 +81,11 @@ class NeuralNetwork(nn.Module):
                 nn.init.xavier_normal_(layer.weight)
                 nn.init.zeros_(layer.bias)
 
-    def trainig_part(self):
+    def trainig_part(self,patience=20, min_delta=1e-5):
         print("Training the model on scaled log(cost) ...")
         best_mse = float('inf')
         best_weights = None
+        epochs_without_improvement = 0 
 
         for epoch in range(self.n_epochs):
             self.line_stack.train()
@@ -96,11 +112,21 @@ class NeuralNetwork(nn.Module):
             with torch.no_grad():
                 y_pred_test = self.line_stack(self.X_test_t)
                 mse = self.loss_fn(y_pred_test, self.y_test_t).item()
+                # self.scheduler.step(mse)
                 self.history.append(mse)
-                if mse < best_mse:
+                if mse + min_delta < best_mse:  
                     best_mse = mse
                     best_weights = copy.deepcopy(self.line_stack.state_dict())
+                    epochs_without_improvement = 0 
+                else:
+                    epochs_without_improvement += 1
+            print(f"Epoch {epoch+1}/{self.n_epochs}, Test MSE: {mse:.6f}")
 
+            # Controllo della pazienza
+            if epochs_without_improvement >= patience:
+                print(f"Early stopping at epoch {epoch+1}. Best MSE: {best_mse:.6f}")
+                break
+        
         # restore weights
         self.line_stack.load_state_dict(best_weights)
         print(f"Training complete. Best MSE (scaled log-cost): {best_mse:.4f}")
@@ -155,29 +181,24 @@ class NeuralNetwork(nn.Module):
 
         return X_train, X_test, y_train, y_test, log_min, log_max
 
-    def evaluation(self, eval_file=None):
-        # Carica i dati dal file CSV
+    def evaluaunation(self, eval_file=None):
         df = pd.read_csv(eval_file)
-        X_data  = df[["q1", "q2", "v1", "v2"]].values  # Assumendo che le colonne siano le stesse
-        costs   = df["cost"].values                   # Valori veri dei costi
+        X_data  = df[["q1", "q2", "v1", "v2"]].values  
+        costs   = df["cost"].values                   
         log_cost = np.log(costs)
 
-        # Normalizzazione dei dati come fatto durante l'addestramento
         log_cost_scaled = self.scaler.transform(log_cost.reshape(-1, 1)).flatten()
         X_t = torch.tensor(X_data, dtype=torch.float32)
         y_t = torch.tensor(log_cost_scaled, dtype=torch.float32).reshape(-1, 1)
 
-        # Predizioni del modello
-        self.line_stack.eval()  # Setta il modello in modalità valutazione
+        self.line_stack.eval() 
         with torch.no_grad():
             y_pred = self.line_stack(X_t).numpy()
             y_true = y_t.numpy()
 
-            # Rimuovi la scalatura per riportare i dati nello spazio originale
             y_pred_unscaled = ((y_pred.flatten() + 1) / 2) * (self.log_max - self.log_min) + self.log_min
             y_true_unscaled = ((y_true.flatten() + 1) / 2) * (self.log_max - self.log_min) + self.log_min
 
-            # Metriche di valutazione
             mse = np.mean((y_pred_unscaled - y_true_unscaled) ** 2)
             rmse = np.sqrt(mse)
             mae = np.mean(np.abs(y_pred_unscaled - y_true_unscaled))
@@ -187,7 +208,6 @@ class NeuralNetwork(nn.Module):
         print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
         print(f"Mean Absolute Error (MAE): {mae:.4f}")
 
-        # Visualizza predizioni vs. valori veri
         plt.figure(figsize=(10, 5))
         plt.plot(y_true_unscaled, label="True Costs")
         plt.plot(y_pred_unscaled, label="Predicted Costs", linestyle='--')
@@ -221,4 +241,4 @@ if __name__ == "__main__":
 
     torch.save({'model': net.state_dict()}, "models/model.pt")
     print("Model saved.")
-    net.evaluation(csv_eval)
+    net.evaluaunation(csv_eval)

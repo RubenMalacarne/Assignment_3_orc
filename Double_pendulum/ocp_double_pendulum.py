@@ -49,36 +49,46 @@ class DoublePendulumOCP:
         print("Initializeation Double_Pendulum OCP complete!")
 
     def set_initial_state_list(self):
-        
-        n_qs = self.number_init_state
-        n_dqs = self.number_init_state
-        
-        q_min = 0
-        q_max = np.pi
-        
-        dq_min = 0.0
-        dq_max = 8.0
+        q_min, q_max = 0.0, np.pi
+        dq_min, dq_max = 0.0, 8.0
 
-        # Sfasamento
-        phi = np.pi / 4  
-        dq_phi = 2.0
+        q1_list = np.zeros((self.number_init_state, 1))
+        v1_list = np.zeros((self.number_init_state, 1))
+        q2_list = np.zeros((self.number_init_state, 1))
+        v2_list = np.zeros((self.number_init_state, 1))
 
-        qs = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
-        q_step = (q_max - q_min) / (n_qs - 1)
-        qs = np.arange(q_min, q_max + q_step, q_step)
-        if qs.size != n_qs:
-            qs = qs[:n_qs]  
-        qs = qs.reshape(n_qs, 1)
+        if config.random_initial_set:
+            # Genera tutto random uniformemente nello spazio [q_min,q_max], [dq_min,dq_max]
+            q1_list = np.random.uniform(q_min,  q_max,  (self.number_init_state, 1))
+            q2_list = np.random.uniform(q_min,  q_max,  (self.number_init_state, 1))
+            v1_list = np.random.uniform(dq_min, dq_max, (self.number_init_state, 1))
+            v2_list = np.random.uniform(dq_min, dq_max, (self.number_init_state, 1))
 
-        dqs = np.linspace(dq_min, dq_max, n_dqs).reshape(n_dqs, 1)
-        # angular velocity
-        dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
-        # random position
-        if (config.random_initial_set):    #random uniform distribution initial set
-            qs = np.random.uniform(q_min, q_max, (n_qs, 1)) 
-            dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
-            dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
-        return qs, dqs, qs + phi, dqs2
+        else:
+            # Genera una discretizzazione semplice lineare e applica uno shift!!!! 
+            phi = np.pi / 4  
+            dq_phi = 2.0
+
+            q_lin  = np.linspace(q_min,  q_max,  self.number_init_state)
+            dq_lin = np.linspace(dq_min, dq_max, self.number_init_state)
+
+            for i in range(self.number_init_state):
+                # q1, v1 da griglia
+                q1_list[i, 0] = q_lin[i]
+                v1_list[i, 0] = dq_lin[i]
+
+                # q2 è q1 + phi, con eventuale "avvolgimento", zio pera !!!
+                q2_val = q_lin[i] + phi
+                if q2_val > q_max:
+                    q2_val -= (q_max - q_min)
+                q2_list[i, 0] = q2_val
+
+                v2_val = dq_lin[i] + dq_phi
+                if v2_val > dq_max:
+                    v2_val -= (dq_max - dq_min)
+                v2_list[i, 0] = v2_val
+
+        return q1_list, v1_list, q2_list, v2_list
     
     def set_dynamics(self):
         #use the alternative multi-body dynamics modeling 
@@ -259,6 +269,7 @@ if __name__ == "__main__":
         nn.trainig_part()
         nn.plot_training_history()
         # Save the trained model
+        os.makedirs("models", exist_ok=True)
         torch.save( {'model':nn.state_dict()}, "models/model.pt")
     
     print("Total script time:", clock() - time_start)

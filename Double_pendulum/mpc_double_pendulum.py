@@ -27,14 +27,14 @@ class DoublePendulumMPC:
         self.robot  = load(robot_model)
         self.kinDyn = KinDynComputations(self.robot.urdf, [s for s in self.robot.model.names[1:]])
         self.nq     = len(self.robot.model.names[1:])
-        
+        self.dt = config.dt
+        self.dt_sim = config.dt_sim
         self.number_init_state = config.n_init_state_ocp
         self.q1_list,self.v1_list,self.q2_list,self.v2_list = self.set_initial_state_list()
         self.N  = config.N_step
         self.M  = config.M_step
         self.N_sim = config.N_sim
         
-        self.running_costs = [None] * (self.N)
         
         self.q_des = config.q_des
         self.nx = 2 * self.nq
@@ -137,7 +137,7 @@ class DoublePendulumMPC:
         elif with_M:
             iteration = self.M
         else:
-            iteration = self.N  # fallback
+            iteration = self.N  
 
         self.opti = cs.Opti()
         
@@ -159,13 +159,14 @@ class DoublePendulumMPC:
         
         self.opti.subject_to(X[0] == param_x_init)
         
+        self.running_costs = [None] * (iteration)
         cost_expr = 0.0
-        
         for i in range(iteration):
             q_error = X[i][:self.nq] - param_q_des
+            dq_error = X[i][self.nq:]
             
             cost_expr += self.w_p * (q_error.T @ q_error)
-            cost_expr += self.w_v * (X[i][self.nq:].T @ X[i][self.nq:])
+            cost_expr += self.w_v * (dq_error.T @ dq_error)
             cost_expr += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
             
             self.running_costs[i]=cost_expr
@@ -189,7 +190,9 @@ class DoublePendulumMPC:
         # Terminal cost with NN
         if term_cost_NN:
             cost_pred_nn = self.cost_from_NN(X[-1])  # x[-1] in CasADi
+            dq_final      = X[-1][self.nq:]
             cost_expr   += self.w_value_nn * cost_pred_nn
+            self.opti.subject_to(dq_final == 0.0)
         
         # Terminal cost "Hybrid"
         if term_cost_hy:
@@ -199,10 +202,12 @@ class DoublePendulumMPC:
             cost_expr    += self.w_final * dq_final.T @  dq_final
             cost_pred_nn  = self.cost_from_NN(X[-1])
             cost_expr    += self.w_value_nn * cost_pred_nn
+            self.opti.subject_to(dq_final == 0.0)
 
         self.opti.minimize(cost_expr)
         if (term_cost_NN):
             #se usi la NN
+            
             opts = {
                 "error_on_fail": False,
                 "ipopt.print_level": 0,
@@ -213,7 +218,7 @@ class DoublePendulumMPC:
                 "detect_simple_bounds": True,
                 "ipopt.max_iter": config.SOLVER_MAX_ITER,
                 "ipopt.hessian_approximation": "limited-memory",
-                "ipopt.mu_strategy" : "adaptive"        #use to helt the convergences in NN
+                # "ipopt.mu_strategy" : "adaptive"        #use to helt the convergences in NN
             }
         else:
         #per il resto usare questa
@@ -228,6 +233,17 @@ class DoublePendulumMPC:
                 "ipopt.max_iter": config.SOLVER_MAX_ITER,   #1000 funziona sicuro       # max number of iteration
                 "ipopt.hessian_approximation": "limited-memory"
             }
+        if(iteration>30):
+            #caso con M e N ho degli out of range quindi usato la stessa che si è usata in OCP
+ 
+            opts = {
+                "ipopt.print_level":    0,
+                "ipopt.max_iter":       config.max_iter_opts,
+                "print_time":           0,
+                "ipopt.tol":            1e-3,
+                "ipopt.constr_viol_tol":1e-6
+            }
+            
         self.opti.solver("ipopt", opts)
         
         sol = self.opti.solve()
@@ -245,11 +261,11 @@ class DoublePendulumMPC:
         
         
         cost_zero_counter = 0
+        previous_cost = None
         t_start_mpc = clock()
         print("Start the MPC loop ...")
-        
+         
         x = x_init.copy()
-        
         for i_sim in range(self.N_sim):
             
             self.opti.set_value(param_x_init, x)
@@ -272,15 +288,17 @@ class DoublePendulumMPC:
                 
             running_cost = self.opti.value(cost_expr)
             
-            # function to stop the iteration if cost is = 0  for 5 times
-            if abs(running_cost) < 1e-4:
+
+            if (abs(running_cost) < 1e-4) or (previous_cost is not None and abs(running_cost - previous_cost) < 1e-6):
                 cost_zero_counter += 1
             else:
-                cost_zero_counter = 0
-            if cost_zero_counter >= 5:
-                print("STOP_CONDITION: cost near zero for 5 steps.")
-                store_iteration = i_sim
+                cost_zero_counter = 0 
+
+
+            if cost_zero_counter >= 3:
+                print(f"STOP_CONDITION: Cost below 1e-4 for 5 consecutive iterations")
                 break
+            previous_cost = running_cost
             
             
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
@@ -406,15 +424,7 @@ if __name__ == "__main__":
     
     filename = config.csv_train
     
-    nn = NeuralNetwork(
-        file_name   = filename,
-        input_size  = 4,
-        hidden_size = 12,
-        output_size = 1,
-        n_epochs    = 100,
-        batch_size  = 10,
-        lr          = 0.0001,
-    )
+    nn = NeuralNetwork()
 
     checkpoint = torch.load("models/model.pt", map_location='cpu')
     nn.load_state_dict(checkpoint['model'])
