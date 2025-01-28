@@ -20,15 +20,16 @@ case are:
 if __name__ == "__main__":
     
     time_start = clock()
-    OCP_step = True
-    NN_step = True
-    MPC_step = True
+    OCP_step =  True
+    NN_step =   True
+    MPC_step =  True
     RESULT_step = True
     
+    see_simulation = False
     #STATES_CONSIDER FOR MPC
     config_1 = np.array([-np.pi, 0.050])
-    # config_2 = np.array([np.deg2rad(30),0.50]) 
-    # config_3 = np.array([np.deg2rad(-30), 0.50])
+    config_2 = np.array([np.deg2rad(30),0.50]) 
+    config_3 = np.array([np.deg2rad(-30), 0.50])
     total_config = [config_1]#, config_2, config_3]
     
     if (OCP_step):
@@ -84,7 +85,6 @@ if __name__ == "__main__":
         term_cost_NNet=True
         term_cost_hybrid=True
         
-        see_simulation = False
         
         filename_ocp = config.csv_train
         mpc_single_pendulum = SinglePendulumMPC(filename_ocp)
