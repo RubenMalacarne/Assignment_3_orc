@@ -52,7 +52,7 @@ class SinglePendulumMPC:
         
         self.filename = filename
         
-        print("Inizializzazione SinglePendulumOCP completata!")
+        print("Initialization SinglePendulumMPC complete!")
 
     def set_initial_state_list(self):
         n_qs = self.number_init_state
@@ -166,8 +166,7 @@ class SinglePendulumMPC:
             
             cost_expr += self.w_p * (q_error.T @ q_error)
             cost_expr += self.w_v * (dq_error.T @ dq_error)
-            cost_expr += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
-            
+            cost_expr += self.w_a * (U[i].T @ U[i])                                  
             self.running_costs[i]=cost_expr
             
             x_next = X[i] + config.dt * dynamic_f(X[i], U[i])

@@ -66,7 +66,6 @@ class TriplePendulumMPC:
         phi = np.pi / 4  
         dq_phi = 2.0
 
-        # Generazione uniforme di qs e dqs
         qs = np.linspace(q_min, q_max, n_qs).reshape(n_qs, 1)
         q_step = (q_max - q_min) / (n_qs - 1)
         qs = np.arange(q_min, q_max + q_step, q_step)
@@ -79,13 +78,11 @@ class TriplePendulumMPC:
         # Angular velocity
         dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
 
-        # Generazione casuale per qs, dqs e aggiunta di q3 e dqs3
         if config.random_initial_set:  
             qs = np.random.uniform(q_min, q_max, (n_qs, 1)) 
             dqs = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
             dqs2 = (dqs + dq_phi) % (dq_max - dq_min) + dq_min
 
-        # Generazione casuale di q3 e dqs3
         q3 = np.random.uniform(q_min, q_max, (n_qs, 1))
         dqs3 = np.random.uniform(dq_min, dq_max, (n_dqs, 1))
 
@@ -178,7 +175,7 @@ class TriplePendulumMPC:
             
             cost_expr += self.w_p * (q_error.T @ q_error)
             cost_expr += self.w_v * (dq_error.T @ dq_error)
-            cost_expr += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
+            cost_expr += self.w_a * (U[i].T @ U[i])                      
             
             self.running_costs[i]=cost_expr
             
@@ -244,7 +241,6 @@ class TriplePendulumMPC:
             }
         if(iteration>30):
             #caso con M e N ho degli out of range quindi usato la stessa che si è usata in OCP
- 
             opts = {
                 "ipopt.print_level":    0,
                 "ipopt.max_iter":       config.max_iter_opts,

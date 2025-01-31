@@ -25,7 +25,6 @@ class NeuralNetwork(nn.Module):
                  activation_type=nn.Tanh()):
         super().__init__()
 
-        #load data 
         self.X_train, self.X_test, self.y_train, self.y_test, self.log_min, self.log_max = self.read_file_csv(file_name)
         
         self.X_train_t = torch.tensor(self.X_train, dtype=torch.float32)

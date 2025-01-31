@@ -1,25 +1,19 @@
-from example_robot_data.robots_loader import load
-from adam.casadi.computations import KinDynComputations
+
 import numpy as np
 import casadi as cs
 import os
+import torch
+import pandas as pd
+from time import time as clock
+
+import conf_double_pendulum as config
+from example_robot_data.robots_loader import load
+from adam.casadi.computations import KinDynComputations
 from utils.robot_simulator import RobotSimulator
 from utils.robot_loaders import loadUR
 from utils.robot_wrapper import RobotWrapper
-import torch
-
-import pandas as pd
-
-from time import time as clock
-from time import sleep
-
-import matplotlib.pyplot as plt
-from termcolor import colored
-
-import conf_double_pendulum as config
 from neural_network_doublependulum import NeuralNetwork
 
-from matplotlib.animation import FuncAnimation
 
 class DoublePendulumMPC:
     def __init__(self, filename, robot_model="double_pendulum"):
@@ -35,7 +29,6 @@ class DoublePendulumMPC:
         self.M  = config.M_step
         self.N_sim = config.N_sim
         
-        
         self.q_des = config.q_des
         self.nx = 2 * self.nq
         
@@ -44,11 +37,12 @@ class DoublePendulumMPC:
         self.w_a = config.w_a
         self.w_final = config.w_final
         self.w_value_nn = config.w_value_nn
+        
         self.inv_dyn,self.dynamic_f = self.set_dynamics()
         
         self.filename= filename
         
-        print("Initializeation Double_Pendulum OCP complete!")
+        print("Initialization Double_Pendulum MPC complete!")
         
     def set_initial_state_list(self):
         
@@ -161,13 +155,14 @@ class DoublePendulumMPC:
         
         self.running_costs = [None] * (iteration)
         cost_expr = 0.0
+        
         for i in range(iteration):
             q_error = X[i][:self.nq] - param_q_des
             dq_error = X[i][self.nq:]
             
             cost_expr += self.w_p * (q_error.T @ q_error)
             cost_expr += self.w_v * (dq_error.T @ dq_error)
-            cost_expr += self.w_a * (U[i].T @ U[i])                      # Acceleration cost
+            cost_expr += self.w_a * (U[i].T @ U[i])                      
             
             self.running_costs[i]=cost_expr
             
@@ -176,7 +171,6 @@ class DoublePendulumMPC:
 
             tau = inv_dyn(X[i], U[i])
             self.opti.subject_to(self.opti.bounded(config.TAU_MIN, tau, config.TAU_MAX))
-            #not add other inequelity constraint!
         
         # Terminal cost classic 
         if term_cost_c:
@@ -205,6 +199,7 @@ class DoublePendulumMPC:
             self.opti.subject_to(dq_final == 0.0)
 
         self.opti.minimize(cost_expr)
+        
         if (term_cost_NN):
             #se usi la NN
             
@@ -252,6 +247,8 @@ class DoublePendulumMPC:
         x_sol = np.array([sol.value(X[k]) for k in range(iteration+1)]).T
         u_sol = np.array([sol.value(U[k]) for k in range(iteration)]).T
         # q_trajectory = np.array([sol.value(X[i][:self.nq]) for i in range(iteration + 1)])
+        
+        #-------------------------------- MPC PART-------------------------------------------------
         simu=None
         r = RobotWrapper(self.robot.model, self.robot.collision_model, self.robot.visual_model)
         config.use_viewer = see_simulation
@@ -280,26 +277,21 @@ class DoublePendulumMPC:
             
             lam_g0 = sol.value(self.opti.lam_g)
             self.opti.set_initial(self.opti.lam_g, lam_g0)
-            
             try:
                 sol = self.opti.solve()
             except:
                 sol = self.opti.debug  # fallback
                 
             running_cost = self.opti.value(cost_expr)
-            
-
             if (abs(running_cost) < 1e-4) or (previous_cost is not None and abs(running_cost - previous_cost) < 1e-6):
                 cost_zero_counter += 1
             else:
                 cost_zero_counter = 0 
 
-
             if cost_zero_counter >= 3:
                 print(f"STOP_CONDITION: Cost below 1e-4 for 5 consecutive iterations")
                 break
             previous_cost = running_cost
-            
             
             tau = self.inv_dyn(sol.value(X[0]), sol.value(U[0])).toarray().squeeze()
             #to run the visual simulation
@@ -323,7 +315,6 @@ class DoublePendulumMPC:
             ddq_total.append(actual_ddq)
             store_iteration = i_sim
             print(f"   Step {i_sim} => Running cost = {running_cost:.4f} and actual_q = {actual_q}")
-            
         t_mpc = clock() - t_start_mpc
         
         q_sol = x_sol[:self.nq,:]
@@ -403,8 +394,6 @@ class DoublePendulumMPC:
         }
         np.savez_compressed(save_filename, **data_to_save)
         print(f"Data saved in: {save_filename}")
-
-
 
 # ---------------------------------------------------------------------
 #          MAIN(example)

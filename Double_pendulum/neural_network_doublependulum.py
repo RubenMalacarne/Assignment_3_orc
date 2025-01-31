@@ -25,7 +25,6 @@ class NeuralNetwork(nn.Module):
                  activation_type=nn.Tanh()):
         super().__init__()
 
-        #load data 
         self.X_train, self.X_test, self.y_train, self.y_test, self.log_min, self.log_max = self.read_file_csv(file_name)
         
         self.X_train_t = torch.tensor(self.X_train, dtype=torch.float32)
@@ -122,12 +121,10 @@ class NeuralNetwork(nn.Module):
                     epochs_without_improvement += 1
             print(f"Epoch {epoch+1}/{self.n_epochs}, Test MSE: {mse:.6f}")
 
-            # Controllo della pazienza
             if epochs_without_improvement >= patience:
                 print(f"Early stopping at epoch {epoch+1}. Best MSE: {best_mse:.6f}")
                 break
         
-        # restore weights
         self.line_stack.load_state_dict(best_weights)
         print(f"Training complete. Best MSE (scaled log-cost): {best_mse:.4f}")
         print("MSE:", best_mse)
@@ -160,8 +157,8 @@ class NeuralNetwork(nn.Module):
 
     def read_file_csv(self, file_name):
         df = pd.read_csv(file_name)
-        X_data  = df[["q1","q2","v1","v2"]].values  # shape (N,4)
-        costs   = df["cost"].values                # shape (N,)
+        X_data  = df[["q1","q2","v1","v2"]].values 
+        costs   = df["cost"].values                
         log_cost = np.log(costs)
         self.scaler = MinMaxScaler(feature_range=(-1, 1))
 

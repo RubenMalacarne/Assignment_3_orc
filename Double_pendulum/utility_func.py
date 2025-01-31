@@ -289,6 +289,44 @@ def plot_joint_dynamics(file_path, keys=["q_trajectory", "dq_total", "ddq_total"
     except Exception as e:
         print(f"Error during loading the plots: {e}")
 
+def plot_joint_acceleration(file_paths, key="ddq_total"):
+    num_files = len(file_paths)
+    cols = 2
+    rows = (num_files + 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(12, 8), num="plot_joint_acceleration")
+    axes = axes.flatten()
+    
+    for i, file_path in enumerate(file_paths):
+        try:
+            match = re.search(r"(mpc_\S+)", file_path)
+            if match:
+                title_str = match.group(1).replace(".npz", "")
+            else:
+                title_str = "No MPC title found"
+            
+            data = np.load(file_path, allow_pickle=True)
+            if key in data:
+                ddq_total_trajectory = np.vstack(data[key])
+                
+                for joint_idx in range(ddq_total_trajectory.shape[1]):
+                    axes[i].plot(ddq_total_trajectory[:, joint_idx], label=f"Joint {joint_idx + 1}", linestyle="-", marker="o", markersize=4)
+                
+                axes[i].set_title(f"Acceleration {title_str}")
+                axes[i].set_xlabel("Step")
+                axes[i].set_ylabel("Acceleration (rad/s²)")
+                axes[i].legend()
+                axes[i].grid()
+            else:
+                axes[i].text(0.5, 0.5, f"Key '{key}' missing", ha='center', va='center')
+        except Exception as e:
+            axes[i].text(0.5, 0.5, f"Error: {e}", ha='center', va='center')
+    
+    for j in range(i + 1, len(axes)):
+        axes[j].axis("off")
+    
+    plt.tight_layout()
+    plt.show()
+
 def all_mpc_time(file_paths, keys=["t_mpc", "tot_iteration"]):
     t_mpc_values = []
     tot_iteration_values = []

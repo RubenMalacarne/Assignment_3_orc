@@ -52,7 +52,7 @@ class SinglePendulumOCP:
         
         self.filename = filename
         
-        print("Inizializzazione SinglePendulumOCP completata!")
+        print("Initialization SinglePendulumOCP complet!")
 
     def set_initial_state_list(self):
         n_qs = self.number_init_state

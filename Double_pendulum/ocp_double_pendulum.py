@@ -46,7 +46,7 @@ class DoublePendulumOCP:
         
         self.filename   = filename
         
-        print("Initializeation Double_Pendulum OCP complete!")
+        print("Initialization Double_Pendulum OCP complete!")
 
     def set_initial_state_list(self):
         q_min, q_max = 0.0, np.pi
@@ -73,7 +73,7 @@ class DoublePendulumOCP:
             dq_lin = np.linspace(dq_min, dq_max, self.number_init_state)
 
             for i in range(self.number_init_state):
-                # q1, v1 da griglia
+                # q1, v1 come da griglia!!!
                 q1_list[i, 0] = q_lin[i]
                 v1_list[i, 0] = dq_lin[i]
 
@@ -121,8 +121,8 @@ class DoublePendulumOCP:
         elif with_M:
             iteration = self.M
         else:
-            iteration = self.N  # default
-
+            iteration = self.N
+            
         # ottimization variable
         X, U = [], []
         for i in range(iteration + 1):
@@ -151,7 +151,7 @@ class DoublePendulumOCP:
             
             cost_expr += self.w_p * cs.dot(q_error,  q_error)
             cost_expr += self.w_v * cs.dot(dq_error, dq_error)
-            cost_expr += self.w_a * cs.dot(U[i], U[i])  #acceleration lik in input
+            cost_expr += self.w_a * cs.dot(U[i], U[i])  
             
             # dynamic implementation
             x_next = X[i] + config.dt * self.dynamic_f(X[i], U[i])
@@ -198,7 +198,6 @@ def simulation(ocp_double_pendulum,with_N = True, with_M= False):
     cost_buffer = []        # Buffer to store optimal costs
     #simulation for each type of the initial state
     for current_state in range(number_init_state):
-        #initial state for q1,q2,v1,v2
         q0 = np.array([ocp_double_pendulum.q1_list[current_state][0], ocp_double_pendulum.q2_list[current_state][0]])
         dq0 = np.array([ocp_double_pendulum.v1_list[current_state][0], ocp_double_pendulum.v2_list[current_state][0]])
 
@@ -215,6 +214,7 @@ def simulation(ocp_double_pendulum,with_N = True, with_M= False):
             
             state_buffer.append ([ocp_double_pendulum.q1_list[current_state][0], ocp_double_pendulum.q2_list[current_state][0],ocp_double_pendulum.v1_list[current_state][0], ocp_double_pendulum.v2_list[current_state][0]])
             cost_buffer.append(final_cost)
+            
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print(f"Could not solve for: ")
