@@ -7,7 +7,7 @@
 
 
 
-## Runnare il codice
+## how to run the code
 in each type of pendulum (single, double, triple) you can find a file called `main_test.py` which, if run will execute the following steps according to the condition put in the variables:
 
 1.  `OCP_step =      True`  --> Run the OCP Part
