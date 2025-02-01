@@ -3,7 +3,7 @@
 
 - The following README will cover how to use the scripts, how to run some examples
 
-<img src="Video_simulation.gif"   width="430" height="323">
+<img src="Video_simulation.gif">
 
 
 
