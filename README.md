@@ -1,7 +1,12 @@
 # Assignment_3_orc
 - Questa repo contiene il progetto finale del corso di optimization robot control (progetto scelto: **A**)
 
-- Il seguente tratterà il come utilizzare gli script, come eseguire alcuni esempi
+- Il seguente README tratterà il come utilizzare gli script, come eseguire alcuni esempi
+
+<div style="display: flex; justify-content: space-between;">
+    <img src="Video_Project.MP4" alt="SImulation" style="width: 80%;">
+</div>
+
 
 ## Runnare il codice
 in ogni tipologia di pendolo (singolo, doppio, triplo) è possibile trovare un file chiamato `main_test.py` il quale se fatto partire andrà ad eseguire i seguenti sttep:
