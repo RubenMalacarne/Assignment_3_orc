@@ -153,7 +153,6 @@ class NeuralNetwork(nn.Module):
                                     build_dir=f'{NN_DIR}nn_{robot_name}')
         scaled_log_cost = self.l4c_model(state)  
 
-        #da spiegare
         real_log_cost = ((scaled_log_cost + 1.0)/2.0) * (self.log_max - self.log_min) + self.log_min
         cost_pred     = cs.exp(real_log_cost)  # exponent --> costo sempre > 0
         self.nn_func = Function('nn_func', [state], [cost_pred])
