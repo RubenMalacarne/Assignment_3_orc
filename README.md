@@ -15,7 +15,7 @@ in each type of pendulum (single, double, triple) you can find a file called `ma
 3.  `MPC_step =      True`  --> Run the MPC Part
 4.  `RESULT_step =   True`  --> Run the RESULT saved on NPZ file
 
-l'esecuzione verrà eseguita per ogni configurazione, nella parte di MPC vengono eseguiti 5 differenti modelli:
+Execution will be executed for each configuration, 5 different patterns are executed in the MPC part:
 1. Mpc_M   --> only withM time horizon
 2. Mpc_M_N  --> with M + N time horizon
 3. Mpc_M_TC_NN --> with M and Terminal cost with Neural Network
