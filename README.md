@@ -27,7 +27,7 @@ to exectue file use this code:
 python3 main_test.py
 ```
 
-In case you want to change the system configurations, use the file `conf_double_pendulum.py`, which pemertte to change:
+In case you want to change the system configurations, use the file `conf_XXX_pendulum.py`, which pemertte to change:
 - values of M and N for the time horizon of the OCP
 - simulation steps for MPC
 - System weights (labeled with `w_`)
