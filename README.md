@@ -4,7 +4,7 @@
 - Il seguente README tratterà il come utilizzare gli script, come eseguire alcuni esempi
 
 <div style="display: flex; justify-content: space-between;">
-    <img src="Video_Project.MP4" alt="SImulation" style="width: 80%;">
+    <img src="Video_Project.gif" alt="SImulation" style="width: 80%;">
 </div>
 
 
